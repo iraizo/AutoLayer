@@ -4,13 +4,14 @@ local CTL = _G.ChatThrottleLib
 local triggers = { "inv", "layer", "invite" }
 local invite_queue = {}
 local should_send_party_welcome = false
-local group_count = GetNumGroupMembers()
-
+local group_count = 0
 
 function AutoLayer:ProcessQueue()
     if should_send_party_welcome then
+        local party_chat = GetChannelName("Party")
         CTL:SendChatMessage("NORMAL", "Party", "Welcome to the autolayer service, tips per mail are appreciated!",
-            "PARTY", nil, GetChannelName("Party"))
+            "PARTY", nil, party_chat)
+        should_send_party_welcome = false
     end
 
     for i, playerName in ipairs(invite_queue) do
@@ -21,6 +22,11 @@ function AutoLayer:ProcessQueue()
 end
 
 function AutoLayer:OnInitialize()
+    local name = GetChannelName("Party")
+    group_count = GetNumGroupMembers()
+    -- CTL:SendChatMessage("NORMAL", "Party", "Welcome to the autolayer service, tips per mail are appreciated!",
+    --    "PARTY", nil, name)
+
     WorldFrame:HookScript("OnMouseDown", function(self, button)
         AutoLayer:ProcessQueue()
     end)
@@ -29,16 +35,16 @@ function AutoLayer:OnInitialize()
     f:SetScript("OnKeyDown", AutoLayer.ProcessQueue)
     f:SetPropagateKeyboardInput(true)
 
-    local party_frame = CreateFrame("LayerPartyFrame")
+    local party_frame = CreateFrame("Frame")
 
     party_frame:RegisterEvent("GROUP_ROSTER_UPDATE")
 
     party_frame:SetScript("OnEvent", function(self, event, ...)
         if GetNumGroupMembers() > group_count then
             AutoLayer:Print("Group size increased")
-            group_count = GetNumGroupMembers()
             should_send_party_welcome = true
         end
+        group_count = GetNumGroupMembers()
     end)
 
     local chat_frame = CreateFrame("Frame")
@@ -62,7 +68,7 @@ function AutoLayer:OnInitialize()
                 --C_PartyInfo.InviteUnit(playerName)
 
                 --C_PartyInfo.InviteUnit(playerName)
-                AutoLayer:Print("Invited " .. playerName)
+                AutoLayer:Print("Found trigger: " .. text .. " from " .. playerName)
             end
         end
     end)
