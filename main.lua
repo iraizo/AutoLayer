@@ -1,7 +1,8 @@
 AutoLayer = LibStub("AceAddon-3.0"):NewAddon("AutoLayer", "AceConsole-3.0")
 local CTL = _G.ChatThrottleLib
 
-local triggers = { "inv", "layer", "invite" }
+local triggers = { "layer" }
+local blacklist = { "guild", "wts", "wtb", "GUILD", "WTS", "WTB" }
 local invite_queue = {}
 local should_send_party_welcome = false
 local group_count = 0
@@ -9,8 +10,10 @@ local group_count = 0
 function AutoLayer:ProcessQueue()
     if should_send_party_welcome then
         local party_chat = GetChannelName("Party")
-        CTL:SendChatMessage("NORMAL", "Party", "Welcome to the autolayer service, tips per mail are appreciated!",
-            "PARTY", nil, party_chat)
+        C_Timer.After(5, function()
+            CTL:SendChatMessage("NORMAL", "party", "Welcome to the autolayer service, tips per mail are appreciated!",
+                "PARTY", nil, party_chat)
+        end)
         should_send_party_welcome = false
     end
 
@@ -63,11 +66,14 @@ function AutoLayer:OnInitialize()
         -- iterates over all possible triggers, if a text message contains those words the player will get invited
         for _, trigger in ipairs(triggers) do
             if string.match(text, trigger) then
-                table.insert(invite_queue, playerName)
-                --SendChatMessage("invite" .. playerName, "SAY", nil, nil)
-                --C_PartyInfo.InviteUnit(playerName)
+                for _, blacklisted_keyword in ipairs(blacklist) do
+                    if string.match(text, blacklisted_keyword) then
+                        AutoLayer:Print("Found blacklisted keyword: " .. blacklisted_keyword .. " from " .. playerName)
+                        return
+                    end
+                end
 
-                --C_PartyInfo.InviteUnit(playerName)
+                table.insert(invite_queue, playerName)
                 AutoLayer:Print("Found trigger: " .. text .. " from " .. playerName)
             end
         end
