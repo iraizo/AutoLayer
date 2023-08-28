@@ -1,0 +1,8 @@
+## Interface: 11404
+## Title: AutoLayer
+## Notes: Automatically invites people that want to layer switch
+## Author: raizo
+## Version: 0.1
+
+embeds.xml
+main.lua
