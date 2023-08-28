@@ -2,24 +2,26 @@ AutoLayer = LibStub("AceAddon-3.0"):NewAddon("AutoLayer", "AceConsole-3.0")
 local CTL = _G.ChatThrottleLib
 
 local triggers = { "layer" }
-local blacklist = { "guild", "wts", "wtb", "GUILD", "WTS", "WTB" }
+local blacklist = { "guild", "Guild", "Wts", "Wtb", "wts", "wtb", "GUILD", "WTS", "WTB" }
 local invite_queue = {}
 local should_send_party_welcome = false
 local group_count = 0
 
 function AutoLayer:ProcessQueue()
-    if should_send_party_welcome then
-        local party_chat = GetChannelName("Party")
-        C_Timer.After(5, function()
-            CTL:SendChatMessage("NORMAL", "party", "Welcome to the autolayer service, tips per mail are appreciated!",
-                "PARTY", nil, party_chat)
-        end)
-        should_send_party_welcome = false
-    end
+    for i, invite in ipairs(invite_queue) do
+        local delta = time() - invite.time;
+        local name = invite.name;
+        -- if someone asked for an invite 10 seconds ago, dont invite him
+        if delta >= 10 then
+            AutoLayer:Print("Invitation ask from " .. name .. " expired")
+            return
+        end
 
-    for i, playerName in ipairs(invite_queue) do
-        AutoLayer:Print("Invited " .. playerName)
-        InviteUnit(playerName)
+        AutoLayer:Print("Invited " .. name)
+        CTL:SendChatMessage("NORMAL", name,
+            "[AutoLayer] Automatically invited you to the group, please accept the invite.",
+            "WHISPER", nil, name)
+        InviteUnit(name)
         table.remove(invite_queue, i)
     end
 end
@@ -73,7 +75,10 @@ function AutoLayer:OnInitialize()
                     end
                 end
 
-                table.insert(invite_queue, playerName)
+                table.insert(invite_queue, {
+                    name = playerName,
+                    time = time()
+                })
                 AutoLayer:Print("Found trigger: " .. text .. " from " .. playerName)
             end
         end
