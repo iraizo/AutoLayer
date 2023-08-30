@@ -3,6 +3,9 @@
 ## Notes: Automatically invites people that want to layer switch
 ## Author: raizo
 ## Version: 0.1
+## SavedVariables: AutoLayerDB
 
 embeds.xml
 main.lua
+configuration.lua
+layering.lua

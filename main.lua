@@ -1,109 +1,115 @@
-AutoLayer = LibStub("AceAddon-3.0"):NewAddon("AutoLayer", "AceConsole-3.0")
-local CTL = _G.ChatThrottleLib
+---@diagnostic disable: inject-field
 
-local triggers = { "layer" }
-local blacklist = { "guild", "Guild", "Wts", "Wtb", "wts", "wtb", "GUILD", "WTS", "WTB" }
-local invite_queue = {}
-local should_send_party_welcome = false
-local group_count = 0
+local addonName, addonTable = ...;
 
-function AutoLayer:ProcessQueue()
-    for i, invite in ipairs(invite_queue) do
-        local delta = time() - invite.time;
-        local name = invite.name;
-        -- if someone asked for an invite 10 seconds ago, dont invite him
-        if delta >= 10 then
-            AutoLayer:Print("Invitation ask from " .. name .. " expired")
-            return
-        end
+AutoLayer = LibStub("AceAddon-3.0"):NewAddon("AutoLayer", "AceConsole-3.0", "AceEvent-3.0")
+AceGUI = LibStub("AceGUI-3.0")
+local minimap_icon = LibStub("LibDBIcon-1.0")
 
-        AutoLayer:Print("Invited " .. name)
-        CTL:SendChatMessage("NORMAL", name,
-            "[AutoLayer] Automatically invited you to the group, please accept the invite.",
-            "WHISPER", nil, name)
-        InviteUnit(name)
-        table.remove(invite_queue, i)
-    end
-end
+local options = {
+    name = "AutoLayer",
+    handler = AutoLayer,
+    type = "group",
+    args = {
+        enabled = {
+            type = 'toggle',
+            name = 'Enabled',
+            desc = 'Enable/Disable AutoLayer',
+            set = 'SetEnabled',
+            get = 'GetEnabled',
+        },
 
+        msg = {
+            type = 'input',
+            name = 'Welcome message',
+            desc = 'The message sent to the player/party when they join the group/layer',
+            set = 'SetMessage',
+            get = 'GetMessage',
+        },
+
+        debug = {
+            type = 'toggle',
+            name = 'Debug',
+            desc = 'Enable/Disable debug messages',
+            set = 'SetDebug',
+            get = 'GetDebug',
+        },
+
+        triggers = {
+            type = 'input',
+            name = 'Triggers',
+            desc = 'The triggers that will cause the invite message to be sent, seperated by commas',
+            set = 'SetTriggers',
+            get = 'GetTriggers',
+        },
+
+        minimap = {
+            type = 'toggle',
+            name = 'Hide minimap icon',
+            desc = 'Hide/Show the minimap icon',
+            set = function(info, val)
+                AutoLayer.db.profile.minimap.hide = val
+                if val then
+                    minimap_icon:Hide("AutoLayer")
+                else
+                    minimap_icon:Show("AutoLayer")
+                end
+            end,
+            get = function(info)
+                return AutoLayer.db.profile.minimap.hide
+            end,
+        },
+    }
+}
+
+local defaults = {
+    profile = {
+        enabled = true,
+        debug = false,
+        triggers = "layer, Layer",
+        myMessage = "Welcome to the layer!",
+        layered = 0,
+        minimap = {
+            hide = false,
+        },
+    }
+}
+
+---@diagnostic disable-next-line: duplicate-set-field
 function AutoLayer:OnInitialize()
-    local name = GetChannelName("Party")
-    group_count = GetNumGroupMembers()
-    -- CTL:SendChatMessage("NORMAL", "Party", "Welcome to the autolayer service, tips per mail are appreciated!",
-    --    "PARTY", nil, name)
+    LibStub("AceConfig-3.0"):RegisterOptionsTable("AutoLayer", options)
+    self.db = LibStub("AceDB-3.0"):New("AutoLayerDB", defaults)
+    self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("AutoLayer", "AutoLayer")
+    local icon = ""
 
-    WorldFrame:HookScript("OnMouseDown", function(self, button)
-        AutoLayer:ProcessQueue()
-    end)
+    if self.db.profile.enabled then
+        icon = "Interface\\Icons\\INV_Bijou_Green"
+    else
+        icon = "Interface\\Icons\\INV_Bijou_Red"
+    end
 
-    local f = CreateFrame("Frame", "Test", UIParent)
-    f:SetScript("OnKeyDown", AutoLayer.ProcessQueue)
-    f:SetPropagateKeyboardInput(true)
+    ---@diagnostic disable-next-line: missing-fields
+    local bunnyLDB = LibStub("LibDataBroker-1.1"):NewDataObject("AutoLayer", {
+        type = "data source",
+        text = "AutoLayer",
+        icon = icon,
+        OnClick = function()
+            AutoLayer:Toggle()
+        end,
+        OnTooltipShow = function(tooltip)
+            tooltip:AddLine("AutoLayer")
+            tooltip:AddLine("Click to toggle AutoLayer")
+            tooltip:AddLine("Invited " .. self.db.profile.layered .. " players")
+        end,
+    })
 
-    local party_frame = CreateFrame("Frame")
+    addonTable.bunnyLDB = bunnyLDB
 
-    party_frame:RegisterEvent("GROUP_ROSTER_UPDATE")
-
-    party_frame:SetScript("OnEvent", function(self, event, ...)
-        if GetNumGroupMembers() > group_count then
-            AutoLayer:Print("Group size increased")
-            should_send_party_welcome = true
-        end
-        group_count = GetNumGroupMembers()
-    end)
-
-    local chat_frame = CreateFrame("Frame")
-    chat_frame:RegisterEvent("CHAT_MSG_CHANNEL")
-
-    chat_frame:SetScript("OnEvent", function(self, event, ...)
-        local text, playerName, languageName, channelName, playerName2, specialFlags, zoneChannelID, channelIndex, channelBaseName, languageID, lineID, guid, bnSenderID, isMobile, isSubtitle, hideSenderInLetterbox, supressRaidIcons
-        = ...
-
-        -- dont wanna invite myself
-        if playerName == UnitName("player") then
-            return
-        end
-
-        --C_PartyInfo.InviteUnit(playerName)"
-        -- iterates over all possible triggers, if a text message contains those words the player will get invited
-        for _, trigger in ipairs(triggers) do
-            if string.match(text, trigger) then
-                for _, blacklisted_keyword in ipairs(blacklist) do
-                    if string.match(text, blacklisted_keyword) then
-                        AutoLayer:Print("Found blacklisted keyword: " .. blacklisted_keyword .. " from " .. playerName)
-                        return
-                    end
-                end
-
-                table.insert(invite_queue, {
-                    name = playerName,
-                    time = time()
-                })
-                AutoLayer:Print("Found trigger: " .. text .. " from " .. playerName)
-            end
-        end
-    end)
-
-    AutoLayer:Print("Loaded.")
+    minimap_icon:Register("AutoLayer", bunnyLDB, self.db.profile.minimap)
 end
 
--- function NWB:recalcMinimapLayerFrame(zoneID, event, unit)
---[[
-C_Timer.After(1, function()
-    local children = { UIParent:GetChildren() }
-    for i, child in ipairs(children) do
-        local name = child:GetName()
-        if string.match(name, "MinimapLayerFrame") then
-            print(name)
-            print("AutoLayer: Found MinimapCluster")
-            local minimap_children = { child:GetChildren() }
-
-            for _, minimap_child in ipairs(minimap_children) do
-                for _, another_one in ipairs(minimap_child) do
-                    print(another_one:GetName())
-                end
-            end
-        end
+function AutoLayer:DebugPrint(...)
+    if self.db.profile.debug then
+        self:Print(...)
     end
-end)
---]]
+end

@@ -1,0 +1,14 @@
+------------------------------------------------------------------------
+r126 | funkehdude | 2023-08-18 12:03:47 +0000 (Fri, 18 Aug 2023) | 1 line
+Changed paths:
+   M /trunk/LibDBIcon-1.0_Vanilla.toc
+
+bump toc
+------------------------------------------------------------------------
+r125 | funkehdude | 2023-07-29 21:21:43 +0000 (Sat, 29 Jul 2023) | 1 line
+Changed paths:
+   M /trunk/LibDBIcon-1.0/LibDBIcon-1.0.lua
+
+Remove the 1 pixel icon shift on retail
+------------------------------------------------------------------------
+
