@@ -45,6 +45,32 @@ function AutoLayer:ParseTriggers()
     return triggers
 end
 
+function AutoLayer:SetSendMessage(info, val)
+    AutoLayer:DebugPrint("SetSendMessage", info, val)
+    self.db.profile.sendMessage = val
+end
+
+function AutoLayer:GetSendMessage(info)
+    return self.db.profile.sendMessage
+end
+
+function AutoLayer:SetBlacklist(info, val)
+    AutoLayer:DebugPrint("SetBlacklist", info, val)
+    self.db.profile.blacklist = val
+end
+
+function AutoLayer:GetBlacklist(info)
+    return self.db.profile.blacklist
+end
+
+function AutoLayer:ParseBlacklist()
+    local blacklist = {}
+    for trigger in string.gmatch(self.db.profile.blacklist, "[^,]+") do
+        table.insert(blacklist, trigger)
+    end
+    return blacklist
+end
+
 local bunnyLDB = ...
 
 function AutoLayer:Toggle()

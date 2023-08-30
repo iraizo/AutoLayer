@@ -8,12 +8,23 @@ function AutoLayer:ProcessMessage(_, msg, name)
         return
     end
 
-    local triggers = self:ParseTriggers()
+    if name == UnitName("player") then
+        return
+    end
+
+    local triggers = AutoLayer:ParseTriggers()
 
     for _, trigger in ipairs(triggers) do
-        --self:DebugPrint("Checking trigger", trigger, "against message", msg)
-        -- use gmatch to match the trigger anywhere in the message, case insensitive
         if string.match(msg, trigger) then
+            -- much efficency, much wow!
+            local blacklist = AutoLayer:ParseBlacklist()
+            for _, black in ipairs(blacklist) do
+                if string.match(msg, black) then
+                    self:DebugPrint("Matched blacklist", black, "in message", msg)
+                    return
+                end
+            end
+
             self:DebugPrint("Matched trigger", trigger, "in message", msg)
 
             -- check if we've already invited this player in the last 5 minutes
@@ -31,7 +42,10 @@ function AutoLayer:ProcessMessage(_, msg, name)
             end
 
             InviteUnit(name)
-            CTL:SendChatMessage("NORMAL", name, self.db.profile.myMessage, "WHISPER", nil, name)
+
+            if self.db.profile.sendMessage then
+                CTL:SendChatMessage("NORMAL", name, self.db.profile.myMessage, "WHISPER", nil, name)
+            end
 
             self.db.profile.layered = self.db.profile.layered + 1
 

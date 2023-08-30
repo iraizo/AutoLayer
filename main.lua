@@ -17,6 +17,16 @@ local options = {
             desc = 'Enable/Disable AutoLayer',
             set = 'SetEnabled',
             get = 'GetEnabled',
+            order = 0,
+        },
+
+        should_send_message = {
+            type = 'toggle',
+            name = 'Send message',
+            desc = 'Enable/Disable sending a message to the player/party when they join the group/layer',
+            set = 'SetSendMessage',
+            get = 'GetSendMessage',
+            order = 4,
         },
 
         msg = {
@@ -33,6 +43,7 @@ local options = {
             desc = 'Enable/Disable debug messages',
             set = 'SetDebug',
             get = 'GetDebug',
+            order = 1,
         },
 
         triggers = {
@@ -43,10 +54,19 @@ local options = {
             get = 'GetTriggers',
         },
 
+        blacklist = {
+            type = 'input',
+            name = 'Blacklist',
+            desc = 'The opposite of triggers, if it matches those words in a message it wont invite, seperated by commas',
+            set = 'SetBlacklist',
+            get = 'GetBlacklist',
+        },
+
         minimap = {
             type = 'toggle',
             name = 'Hide minimap icon',
             desc = 'Hide/Show the minimap icon',
+            order = 3,
             set = function(info, val)
                 AutoLayer.db.profile.minimap.hide = val
                 if val then
@@ -67,7 +87,9 @@ local defaults = {
         enabled = true,
         debug = false,
         triggers = "layer, Layer",
-        myMessage = "Welcome to the layer!",
+        myMessage = "[AutoLayer] invited, tips are appreciated!",
+        sendMessage = true,
+        blacklist = "wts, WTS, Wts, sell, Sell, SELL, guild, Guild, GUILD, WTB, wtb, Wtb",
         layered = 0,
         minimap = {
             hide = false,
