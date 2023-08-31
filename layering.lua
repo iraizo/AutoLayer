@@ -9,7 +9,7 @@ function AutoLayer:ProcessMessage(event, msg, name)
     end
 
     local player_name = UnitName("player") .. "-" .. GetRealmName()
-    if name == UnitName("player") then
+    if name == player_name then
         return
     end
 
