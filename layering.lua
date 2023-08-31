@@ -48,8 +48,8 @@ function AutoLayer:ProcessMessage(event, msg, name)
                 end
             end
 
-            -- cooldown of 2,5 minutes always applying if not whispering
-            --table.insert(player_cache, { name = name, time = time() - 150 })
+            -- cooldown of 1 minute always applying if not whispering
+            table.insert(player_cache, { name = name, time = time() - 230 })
             --end
 
             ---@diagnostic disable-next-line: undefined-global
