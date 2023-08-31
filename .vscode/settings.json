@@ -34,7 +34,8 @@
         "message",
         "AddonCompartmentFrame",
         "GetCursorPosition",
-        "CHAT_MSG_SYSTEM"
+        "CHAT_MSG_SYSTEM",
+        "CHAT_MSG_WHISPER"
     ],
     "Lua.diagnostics.disable": [
         "undefined-field"

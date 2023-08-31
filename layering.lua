@@ -8,8 +8,8 @@ function AutoLayer:ProcessMessage(event, msg, name)
         return
     end
 
-    local player_name = UnitName("player") .. "-" .. GetRealmName()
-    if name == player_name then
+    local name_without_realm = ({ strsplit("-", name) })[1]
+    if name_without_realm == UnitName("player") then
         return
     end
 
@@ -29,23 +29,28 @@ function AutoLayer:ProcessMessage(event, msg, name)
             self:DebugPrint("Matched trigger", trigger, "in message", msg)
 
             -- check if we've already invited this player in the last 5 minutes
-            if event ~= "CHAT_MSG_WHISPER" then
-                for i, player in ipairs(player_cache) do
-                    -- delete players from cache that are over 5 minutes old
-                    if player.time + 300 < time() then
-                        self:DebugPrint("Removing ", player.name, " from cache")
-                        table.remove(player_cache, i)
-                    end
-
-                    if player.name == name and player.time + 300 > time() then
-                        self:DebugPrint("Already invited", name, "in the last 5 minutes")
-                        return
-                    end
+            --if event ~= "CHAT_MSG_WHISPER" then
+            for i, player in ipairs(player_cache) do
+                -- delete players from cache that are over 5 minutes old
+                if player.time + 300 < time() then
+                    self:DebugPrint("Removing ", player.name, " from cache")
+                    table.remove(player_cache, i)
                 end
 
-                -- cooldown of 2,5 minutes always applying if not whispering
-                table.insert(player_cache, { name = name, time = time() - 150 })
+                --self:DebugPrint("Checking ", player.name, " against ", name)
+                --self:DebugPrint("Time: ", player.time, " + 300 < ", time(), " = ", player.time + 300 < time())
+
+                -- TODO: add || check with realm name removed from name
+
+                if player.name == name_without_realm and player.time + 300 > time() then
+                    self:DebugPrint("Already invited", name, "in the last 5 minutes")
+                    return
+                end
             end
+
+            -- cooldown of 2,5 minutes always applying if not whispering
+            --table.insert(player_cache, { name = name, time = time() - 150 })
+            --end
 
             ---@diagnostic disable-next-line: undefined-global
             InviteUnit(name)
