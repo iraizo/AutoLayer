@@ -29,22 +29,23 @@ function AutoLayer:ProcessMessage(event, msg, name)
             self:DebugPrint("Matched trigger", trigger, "in message", msg)
 
             -- check if we've already invited this player in the last 5 minutes
-            --if event ~= "CHAT_MSG_WHISPER" then
-            for i, player in ipairs(player_cache) do
-                -- delete players from cache that are over 5 minutes old
-                if player.time + 300 < time() then
-                    self:DebugPrint("Removing ", player.name, " from cache")
-                    table.remove(player_cache, i)
-                end
+            if event ~= "CHAT_MSG_WHISPER" then
+                for i, player in ipairs(player_cache) do
+                    -- delete players from cache that are over 5 minutes old
+                    if player.time + 300 < time() then
+                        self:DebugPrint("Removing ", player.name, " from cache")
+                        table.remove(player_cache, i)
+                    end
 
-                --self:DebugPrint("Checking ", player.name, " against ", name)
-                --self:DebugPrint("Time: ", player.time, " + 300 < ", time(), " = ", player.time + 300 < time())
+                    --self:DebugPrint("Checking ", player.name, " against ", name)
+                    --self:DebugPrint("Time: ", player.time, " + 300 < ", time(), " = ", player.time + 300 < time())
 
-                -- TODO: add || check with realm name removed from name
+                    -- TODO: add || check with realm name removed from name
 
-                if player.name == name_without_realm and player.time + 300 > time() then
-                    self:DebugPrint("Already invited", name, "in the last 5 minutes")
-                    return
+                    if player.name == name_without_realm and player.time + 300 > time() then
+                        self:DebugPrint("Already invited", name, "in the last 5 minutes")
+                        return
+                    end
                 end
             end
 
@@ -71,6 +72,7 @@ function AutoLayer:ProcessSystemMessages(_, a)
     -- X joins the party
     if segments[2] == "joins" and self.db.profile.sendMessage then
         CTL:SendChatMessage("NORMAL", segments[1], self.db.profile.myMessage, "WHISPER", nil, segments[1])
+        self.db.profile.layered = self.db.profile.layered + 1
     end
 
     if segments[2] == "declines" then
