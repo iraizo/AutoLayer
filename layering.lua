@@ -28,16 +28,18 @@ function AutoLayer:ProcessMessage(event, msg, name)
             self:DebugPrint("Matched trigger", trigger, "in message", msg)
 
             -- check if we've already invited this player in the last 5 minutes
-            for i, player in ipairs(player_cache) do
-                if player.name == name and player.time + 300 > time() then
-                    self:DebugPrint("Already invited", name, "in the last 5 minutes")
-                    return
-                end
+            if event ~= "CHAT_MSG_WHISPER" then
+                for i, player in ipairs(player_cache) do
+                    -- delete players from cache that are over 5 minutes old
+                    if player.time + 300 < time() then
+                        self:DebugPrint("Removing ", player.name, " from cache")
+                        table.remove(player_cache, i)
+                    end
 
-                -- delete players from cache that are over 5 minutes old
-                if player.time + 300 < time() then
-                    self:DebugPrint("Removing ", player.name, " from cache")
-                    table.remove(player_cache, i)
+                    if player.name == name and player.time + 300 > time() then
+                        self:DebugPrint("Already invited", name, "in the last 5 minutes")
+                        return
+                    end
                 end
             end
 
@@ -51,11 +53,13 @@ function AutoLayer:ProcessMessage(event, msg, name)
             self.db.profile.layered = self.db.profile.layered + 1
 
             if event ~= "CHAT_MSG_WHISPER" then
+                self:DebugPrint("Adding ", name, " to cache")
                 table.insert(player_cache, {
                     name = name,
                     time = time()
                 })
             end
+            return
         end
     end
 end
