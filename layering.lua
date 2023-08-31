@@ -3,7 +3,7 @@ local CTL = _G.ChatThrottleLib
 local player_cache = {}
 
 ---@diagnostic disable-next-line:inject-field
-function AutoLayer:ProcessMessage(_, msg, name)
+function AutoLayer:ProcessMessage(event, msg, name)
     if not self.db.profile.enabled then
         return
     end
@@ -50,11 +50,12 @@ function AutoLayer:ProcessMessage(_, msg, name)
 
             self.db.profile.layered = self.db.profile.layered + 1
 
-            table.insert(player_cache, {
-                name = name,
-                time = time()
-            })
-            return
+            if event ~= "CHAT_MSG_WHISPER" then
+                table.insert(player_cache, {
+                    name = name,
+                    time = time()
+                })
+            end
         end
     end
 end
