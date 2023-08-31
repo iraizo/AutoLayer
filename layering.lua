@@ -8,6 +8,7 @@ function AutoLayer:ProcessMessage(event, msg, name)
         return
     end
 
+    local player_name = UnitName("player") .. "-" .. GetRealmName()
     if name == UnitName("player") then
         return
     end
@@ -41,29 +42,39 @@ function AutoLayer:ProcessMessage(event, msg, name)
                         return
                     end
                 end
+
+                -- cooldown of 2,5 minutes always applying if not whispering
+                table.insert(player_cache, { name = name, time = time() - 150 })
             end
 
             ---@diagnostic disable-next-line: undefined-global
             InviteUnit(name)
 
-            if self.db.profile.sendMessage then
-                CTL:SendChatMessage("NORMAL", name, self.db.profile.myMessage, "WHISPER", nil, name)
-            end
-
-            self.db.profile.layered = self.db.profile.layered + 1
-
-            if event ~= "CHAT_MSG_WHISPER" then
-                self:DebugPrint("Adding ", name, " to cache")
-                table.insert(player_cache, {
-                    name = name,
-                    time = time()
-                })
-            end
             return
         end
+    end
+end
+
+---@diagnostic disable-next-line: inject-field
+function AutoLayer:ProcessSystemMessages(_, a)
+    if not self.db.profile.enabled then
+        return
+    end
+
+    local segments = { strsplit(" ", a) }
+
+    -- X joins the party
+    if segments[2] == "joins" and self.db.profile.sendMessage then
+        CTL:SendChatMessage("NORMAL", segments[1], self.db.profile.myMessage, "WHISPER", nil, segments[1])
+    end
+
+    if segments[2] == "declines" then
+        table.insert(player_cache, { name = segments[1], time = time() })
+        self:DebugPrint("Adding ", segments[1], " to cache, reason: declined invite")
     end
 end
 
 AutoLayer:RegisterEvent("CHAT_MSG_CHANNEL", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_WHISPER", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_GUILD", "ProcessMessage")
+AutoLayer:RegisterEvent("CHAT_MSG_SYSTEM", "ProcessSystemMessages")
