@@ -15,7 +15,7 @@ function AutoLayer:ProcessMessage(_, msg, name)
     local triggers = AutoLayer:ParseTriggers()
 
     for _, trigger in ipairs(triggers) do
-        if string.match(msg, trigger) then
+        if msg:find("%f[%a]layer%f[%A]") then
             -- much efficency, much wow!
             local blacklist = AutoLayer:ParseBlacklist()
             for _, black in ipairs(blacklist) do
@@ -41,6 +41,7 @@ function AutoLayer:ProcessMessage(_, msg, name)
                 end
             end
 
+            ---@diagnostic disable-next-line: undefined-global
             InviteUnit(name)
 
             if self.db.profile.sendMessage then
