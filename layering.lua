@@ -15,11 +15,11 @@ function AutoLayer:ProcessMessage(event, msg, name)
     local triggers = AutoLayer:ParseTriggers()
 
     for _, trigger in ipairs(triggers) do
-        if msg:find("%f[%a]layer%f[%A]") then
+        if string.find(string.lower(msg), "%f[%a]layer%f[%A]") then
             -- much efficency, much wow!
             local blacklist = AutoLayer:ParseBlacklist()
             for _, black in ipairs(blacklist) do
-                if string.match(msg, black) then
+                if string.match(string.lower(msg), string.lower(black)) then
                     self:DebugPrint("Matched blacklist", black, "in message", msg)
                     return
                 end
