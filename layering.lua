@@ -1,6 +1,20 @@
+local addonName, addonTable = ...;
 local CTL = _G.ChatThrottleLib
 
 local player_cache = {}
+
+C_Timer.After(0.1, function()
+    for name in LibStub("AceAddon-3.0"):IterateAddons() do
+        if name == "NovaWorldBuffs" then
+            addonTable.NWB = LibStub("AceAddon-3.0"):GetAddon("NovaWorldBuffs")
+            return
+        end
+    end
+
+    if addonTable.NWB == nil then
+        AutoLayer:Print("Could not find NovaWorldBuffs, disabling NovaWorldBuffs integration")
+    end
+end)
 
 ---@diagnostic disable-next-line:inject-field
 function AutoLayer:ProcessMessage(event, msg, name)
@@ -53,6 +67,11 @@ function AutoLayer:ProcessMessage(event, msg, name)
             table.insert(player_cache, { name = name, time = time() - 230 })
             --end
 
+            if addonTable.NWB ~= nil and addonTable.NWB.currentLayer ~= 0 then
+                CTL:SendChatMessage("NORMAL", name, "[AutoLayer] invited to layer " .. NWB.currentLayer, "WHISPER", nil,
+                    name)
+            end
+
             ---@diagnostic disable-next-line: undefined-global
             InviteUnit(name)
 
@@ -71,7 +90,7 @@ function AutoLayer:ProcessSystemMessages(_, a)
 
     -- X joins the party
     if segments[2] == "joins" and self.db.profile.sendMessage then
-        CTL:SendChatMessage("NORMAL", segments[1], self.db.profile.myMessage, "WHISPER", nil, segments[1])
+        -- CTL:SendChatMessage("NORMAL", segments[1], self.db.profile.myMessage, "WHISPER", nil, segments[1])
         self.db.profile.layered = self.db.profile.layered + 1
     end
 

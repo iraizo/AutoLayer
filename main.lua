@@ -121,7 +121,15 @@ function AutoLayer:OnInitialize()
         OnTooltipShow = function(tooltip)
             tooltip:AddLine("AutoLayer")
             tooltip:AddLine("Click to toggle AutoLayer")
-            tooltip:AddLine("Invited " .. self.db.profile.layered .. " players")
+            tooltip:AddLine("Layered " .. self.db.profile.layered .. " players")
+
+            if addonTable.NWB ~= nil then
+                if addonTable.NWB.currentLayer == 0 then
+                    tooltip:AddLine("Current layer: unknown, target an NPC")
+                else
+                    tooltip:AddLine("Current layer: " .. addonTable.NWB.currentLayer)
+                end
+            end
         end,
     })
 
