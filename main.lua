@@ -20,23 +20,6 @@ local options = {
             order = 0,
         },
 
-        should_send_message = {
-            type = 'toggle',
-            name = 'Send message',
-            desc = 'Enable/Disable sending a message to the player/party when they join the group/layer',
-            set = 'SetSendMessage',
-            get = 'GetSendMessage',
-            order = 4,
-        },
-
-        msg = {
-            type = 'input',
-            name = 'Welcome message',
-            desc = 'The message sent to the player/party when they join the group/layer',
-            set = 'SetMessage',
-            get = 'GetMessage',
-        },
-
         debug = {
             type = 'toggle',
             name = 'Debug',
@@ -87,7 +70,6 @@ local defaults = {
         enabled = true,
         debug = false,
         triggers = "layer, Layer",
-        myMessage = "[AutoLayer] invited, tips are appreciated!",
         sendMessage = false,
         blacklist = "wts, wtb, guild, lf, lfm, player, enchant",
         layered = 0,

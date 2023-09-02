@@ -1,14 +1,5 @@
-local addonName, addonTable = ...;
-
 ---@diagnostic disable: inject-field
-function AutoLayer:SetMessage(info, val)
-    AutoLayer:Print("SetMyMessage", info, val)
-    self.db.profile.myMessage = val
-end
-
-function AutoLayer:GetMessage(info)
-    return self.db.profile.myMessage
-end
+local addonName, addonTable = ...;
 
 function AutoLayer:SetDebug(info, val)
     AutoLayer:DebugPrint("SetDebug", info, val)

@@ -68,7 +68,8 @@ function AutoLayer:ProcessMessage(event, msg, name)
             --end
 
             if addonTable.NWB ~= nil and addonTable.NWB.currentLayer ~= 0 then
-                CTL:SendChatMessage("NORMAL", name, "[AutoLayer] invited to layer " .. NWB.currentLayer, "WHISPER", nil,
+                CTL:SendChatMessage("NORMAL", name, "[AutoLayer] invited to layer " .. addonTable.NWB.currentLayer,
+                    "WHISPER", nil,
                     name)
             end
 
@@ -89,8 +90,7 @@ function AutoLayer:ProcessSystemMessages(_, a)
     local segments = { strsplit(" ", a) }
 
     -- X joins the party
-    if segments[2] == "joins" and self.db.profile.sendMessage then
-        -- CTL:SendChatMessage("NORMAL", segments[1], self.db.profile.myMessage, "WHISPER", nil, segments[1])
+    if segments[2] == "joins" then
         self.db.profile.layered = self.db.profile.layered + 1
     end
 
