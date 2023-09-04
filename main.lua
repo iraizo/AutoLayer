@@ -40,7 +40,9 @@ local options = {
         autokick = {
             type = 'toggle',
             name = 'Auto kick',
-            desc = 'Enable/Disable kicks the last member out if the group is full',
+            -- add red text to desc "test"
+            desc =
+            'Enable/Disable kicks the last member out if the group is full red \124cffFF0000You need to drag your mouse to trigger it due to an API restriction\124r',
             set = function(info, val)
                 AutoLayer.db.profile.autokick = val
             end,
