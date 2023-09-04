@@ -82,12 +82,6 @@ function AutoLayer:ProcessMessage(event, msg, name)
 
             --end
 
-            if addonTable.NWB ~= nil and addonTable.NWB.currentLayer ~= 0 then
-                CTL:SendChatMessage("NORMAL", name, "[AutoLayer] invited to layer " .. addonTable.NWB.currentLayer,
-                    "WHISPER", nil,
-                    name)
-            end
-
             ---@diagnostic disable-next-line: undefined-global
             InviteUnit(name)
 
@@ -114,6 +108,14 @@ function AutoLayer:ProcessSystemMessages(_, a)
     if segments[2] == "declines" then
         table.insert(player_cache, { name = segments[1], time = time() })
         self:DebugPrint("Adding ", segments[1], " to cache, reason: declined invite")
+    end
+
+    if segments[3] == "invited" then
+        if addonTable.NWB ~= nil and addonTable.NWB.currentLayer ~= 0 then
+            CTL:SendChatMessage("NORMAL", segments[4], "[AutoLayer] invited to layer " .. addonTable.NWB.currentLayer,
+                "WHISPER", nil,
+                segments[4])
+        end
     end
 end
 
