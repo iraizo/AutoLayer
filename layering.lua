@@ -2,6 +2,7 @@ local addonName, addonTable = ...;
 local CTL = _G.ChatThrottleLib
 
 local player_cache = {}
+local kick_player = nil
 
 C_Timer.After(0.1, function()
     for name in LibStub("AceAddon-3.0"):IterateAddons() do
@@ -42,6 +43,20 @@ function AutoLayer:ProcessMessage(event, msg, name)
 
             self:DebugPrint("Matched trigger", trigger, "in message", msg)
 
+            -- check if group is full
+            if self.db.profile.autokick and GetNumGroupMembers() == 5 then
+                self:DebugPrint("Group is full, kicking")
+
+                -- kick first member after group leader
+                for i = 1, GetNumGroupMembers() do
+                    if UnitIsGroupLeader("player") and i ~= 1 then
+                        kick_player = GetRaidRosterInfo(i)
+                    end
+                end
+
+                return
+            end
+
             -- check if we've already invited this player in the last 5 minutes
             if event ~= "CHAT_MSG_WHISPER" then
                 for i, player in ipairs(player_cache) do
@@ -54,17 +69,17 @@ function AutoLayer:ProcessMessage(event, msg, name)
                     --self:DebugPrint("Checking ", player.name, " against ", name)
                     --self:DebugPrint("Time: ", player.time, " + 300 < ", time(), " = ", player.time + 300 < time())
 
-                    -- TODO: add || check with realm name removed from name
+                    local player_name_without_realm = ({ strsplit("-", player.name) })[1]
 
-                    if player.name == name_without_realm and player.time + 300 > time() then
+                    -- dont invite player if they got invited in the last 5 minutes
+
+                    if player.name == name_without_realm or player_name_without_realm == name_without_realm and player.time + 300 > time() then
                         self:DebugPrint("Already invited", name, "in the last 5 minutes")
                         return
                     end
                 end
             end
 
-            -- cooldown of 1 minute always applying if not whispering
-            table.insert(player_cache, { name = name, time = time() - 230 })
             --end
 
             if addonTable.NWB ~= nil and addonTable.NWB.currentLayer ~= 0 then
@@ -92,6 +107,8 @@ function AutoLayer:ProcessSystemMessages(_, a)
     -- X joins the party
     if segments[2] == "joins" then
         self.db.profile.layered = self.db.profile.layered + 1
+
+        table.insert(player_cache, { name = segments[1], time = time() - 100 })
     end
 
     if segments[2] == "declines" then
@@ -100,7 +117,25 @@ function AutoLayer:ProcessSystemMessages(_, a)
     end
 end
 
+function AutoLayer:HandleAutoKick()
+    if not self.db.profile.enabled then
+        return
+    end
+
+    if self.db.profile.autokick and kick_player ~= nil then
+        self:DebugPrint("Kicking ", kick_player)
+        UninviteUnit(kick_player)
+        kick_player = nil
+    end
+end
+
 AutoLayer:RegisterEvent("CHAT_MSG_CHANNEL", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_WHISPER", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_GUILD", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_SYSTEM", "ProcessSystemMessages")
+
+C_Timer.After(1, function()
+    WorldFrame:HookScript("OnMouseDown", function(self, button)
+        AutoLayer:HandleAutoKick()
+    end)
+end)

@@ -35,9 +35,14 @@
         "AddonCompartmentFrame",
         "GetCursorPosition",
         "CHAT_MSG_SYSTEM",
-        "CHAT_MSG_WHISPER"
+        "CHAT_MSG_WHISPER",
+        "DEFAULT",
+        "ChatFrame1",
+        "ChatFrame_RemoveChannel",
+        "CHANNEL"
     ],
     "Lua.diagnostics.disable": [
-        "undefined-field"
+        "undefined-field",
+        "inject-field"
     ]
 }

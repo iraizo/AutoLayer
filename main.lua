@@ -37,6 +37,19 @@ local options = {
             get = 'GetTriggers',
         },
 
+        autokick = {
+            type = 'toggle',
+            name = 'Auto kick',
+            desc = 'Enable/Disable kicks the last member out if the group is full',
+            set = function(info, val)
+                AutoLayer.db.profile.autokick = val
+            end,
+            get = function(info)
+                return AutoLayer.db.profile.autokick
+            end,
+            order = 2,
+        },
+
         blacklist = {
             type = 'input',
             name = 'Blacklist',
@@ -49,7 +62,7 @@ local options = {
             type = 'toggle',
             name = 'Hide minimap icon',
             desc = 'Hide/Show the minimap icon',
-            order = 3,
+            order = 4,
             set = function(info, val)
                 AutoLayer.db.profile.minimap.hide = val
                 if val then
@@ -76,6 +89,7 @@ local defaults = {
         minimap = {
             hide = false,
         },
+        autokick = true
     }
 }
 
