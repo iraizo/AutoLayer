@@ -49,23 +49,33 @@ function AutoLayer:HopGUI()
     layer:SetValue(selected_layer)
   end
 
-  layer:SetList(layers)
-  layer:SetCallback("OnValueChanged", function(_, _, v)
-    for i, selected_layer in ipairs(selected_layers) do
-      if selected_layer == v then
-        table.remove(selected_layers, i)
-        return
-      end
-    end
-    table.insert(selected_layers, v)
-  end)
-
   -- add send button under it
   local send = AceGUI:Create("Button")
   send:SetText("Send")
   send:SetWidth(100)
   send:SetCallback("OnClick", function()
+    for _, v in ipairs(selected_layers) do
+      AutoLayer:DebugPrint(v)
+    end
+
     AutoLayer:SendLayerRequest()
+  end)
+
+  send:SetDisabled(true)
+
+  layer:SetList(layers)
+  layer:SetCallback("OnValueChanged", function(_, _, v)
+    for i, selected_layer in ipairs(selected_layers) do
+      if selected_layer == v then
+        table.remove(selected_layers, i)
+        if #selected_layers == 0 then
+          send:SetDisabled(true)
+        end
+        return
+      end
+    end
+    send:SetDisabled(false)
+    table.insert(selected_layers, v)
   end)
 
   -- add space between button and desc

@@ -52,7 +52,7 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
         end
 
         AutoLayer:DebugPrint("Received layer request (encoded): " .. payload)
-
+        AutoLayer:DebugPrint("Player " .. name .. " requested layer" .. table.concat(layers, ", "))
         for _, layer in ipairs(layers) do
             if layer == addonTable.NWB.currentLayer then
                 InviteUnit(name)
