@@ -131,7 +131,8 @@ function AutoLayer:OnInitialize()
         end,
         OnTooltipShow = function(tooltip)
             tooltip:AddLine("AutoLayer")
-            tooltip:AddLine("Click to toggle AutoLayer")
+            tooltip:AddLine("Left-click to toggle AutoLayer")
+            tooltip:AddLine("Right-click to hop layers")
             tooltip:AddLine("Layered " .. self.db.profile.layered .. " players")
 
             if addonTable.NWB ~= nil then
