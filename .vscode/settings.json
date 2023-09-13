@@ -52,7 +52,8 @@
         "GetNumGroupMembers",
         "time",
         "UnitIsGroupLeader",
-        "GetRaidRosterInfo"
+        "GetRaidRosterInfo",
+        "InterfaceOptionsFrame_OpenToCategory"
     ],
     "Lua.diagnostics.disable": [
         "undefined-field",

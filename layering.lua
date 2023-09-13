@@ -18,13 +18,57 @@ C_Timer.After(0.1, function()
 end)
 
 ---@diagnostic disable-next-line:inject-field
-function AutoLayer:ProcessMessage(event, msg, name)
+function AutoLayer:ProcessMessage(event, msg, name, _, channel)
     if not self.db.profile.enabled then
         return
     end
 
     local name_without_realm = ({ strsplit("-", name) })[1]
     if name_without_realm == UnitName("player") then
+        return
+    end
+
+
+    if channel:match(addonName) and addonTable.NWB ~= nil and addonTable.NWB.currentLayer ~= nil then
+        local payload = addonTable.LibDeflate:DecodeForPrint(msg)
+
+        if payload == nil then
+            AutoLayer:DebugPrint("Failed to decode layer request")
+            return
+        end
+
+        local decompressed = addonTable.LibDeflate:DecompressDeflate(payload)
+
+        if decompressed == nil then
+            AutoLayer:DebugPrint("Failed to decompress layer request")
+            return
+        end
+
+        local success, layers = addonTable.LibSerialize:Deserialize(decompressed)
+
+        if not success then
+            AutoLayer:DebugPrint("Failed to decode layer request")
+            return
+        end
+
+        AutoLayer:DebugPrint("Received layer request (encoded): " .. payload)
+
+        for _, layer in ipairs(layers) do
+            if layer == addonTable.NWB.currentLayer then
+                InviteUnit(name)
+                CTL:SendChatMessage("NORMAL", name, "[AutoLayer] invited to layer " .. addonTable.NWB.currentLayer,
+                    "WHISPER", nil,
+                    name)
+                return
+            end
+        end
+
+        --d  print(layers)
+        return
+    end
+
+    -- TODO: remove this before launch again
+    if true then
         return
     end
 
@@ -136,8 +180,44 @@ AutoLayer:RegisterEvent("CHAT_MSG_WHISPER", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_GUILD", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_SYSTEM", "ProcessSystemMessages")
 
+function JoinHoppingChannel()
+    JoinChannelByName("AutoLayer", "autolayer")
+    local channel_num = GetChannelName("AutoLayer")
+    if channel_num == 0 then
+        print("Failed to join death alerts channel")
+    else
+        print("Successfully joined deathlog channel.")
+    end
+
+    for i = 1, 10 do
+        if _G['ChatFrame' .. i] then
+            ChatFrame_RemoveChannel(_G['ChatFrame' .. i], "AutoLayers")
+        end
+    end
+end
+
+function ProccessQueue()
+    if #addonTable.send_queue > 0 then
+        local payload = table.remove(addonTable.send_queue, 1)
+        local channel_num = GetChannelName("AutoLayer")
+        if channel_num == 0 then
+            JoinHoppingChannel()
+            return
+        end
+
+        AutoLayer:DebugPrint("Sent layer request (encoded): " .. payload)
+
+        CTL:SendChatMessage("BULK", "AutoLayer", payload, "CHANNEL", nil, channel_num)
+    end
+end
+
 C_Timer.After(1, function()
     WorldFrame:HookScript("OnMouseDown", function(self, button)
         AutoLayer:HandleAutoKick()
+        ProccessQueue()
     end)
 end)
+
+local f = CreateFrame("Frame", "Test", UIParent)
+f:SetScript("OnKeyDown", ProccessQueue)
+f:SetPropagateKeyboardInput(true)

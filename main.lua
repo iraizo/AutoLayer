@@ -113,7 +113,20 @@ function AutoLayer:OnInitialize()
         type = "data source",
         text = "AutoLayer",
         icon = icon,
-        OnClick = function()
+
+        -- listen for right click
+        OnClick = function(self, button)
+            if button == "LeftButton" then
+                AutoLayer:Toggle()
+            end
+
+            if button == "RightButton" then
+                AutoLayer:HopGUI()
+            end
+        end,
+
+        onMouseUp = function(self, button)
+            print(button)
             AutoLayer:Toggle()
         end,
         OnTooltipShow = function(tooltip)
@@ -135,7 +148,7 @@ function AutoLayer:OnInitialize()
 
     minimap_icon:Register("AutoLayer", bunnyLDB, self.db.profile.minimap)
 
-    C_ChatInfo.RegisterAddonMessagePrefix("AutoLayer")
+    C_ChatInfo.RegisterAddonMessagePrefix(addonName)
     C_Timer.After(2, function()
         AutoLayer:HopGUI()
     end)
