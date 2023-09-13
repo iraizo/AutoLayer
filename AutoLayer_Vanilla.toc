@@ -9,3 +9,4 @@ embeds.xml
 main.lua
 configuration.lua
 layering.lua
+hopping.lua

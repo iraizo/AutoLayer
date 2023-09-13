@@ -39,7 +39,20 @@
         "DEFAULT",
         "ChatFrame1",
         "ChatFrame_RemoveChannel",
-        "CHANNEL"
+        "CHANNEL",
+        "table",
+        "string",
+        "C_ChatInfo",
+        "C_Timer",
+        "_G",
+        "ipairs",
+        "UninviteUnit",
+        "UnitName",
+        "strsplit",
+        "GetNumGroupMembers",
+        "time",
+        "UnitIsGroupLeader",
+        "GetRaidRosterInfo"
     ],
     "Lua.diagnostics.disable": [
         "undefined-field",

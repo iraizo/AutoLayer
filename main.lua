@@ -134,6 +134,11 @@ function AutoLayer:OnInitialize()
     addonTable.bunnyLDB = bunnyLDB
 
     minimap_icon:Register("AutoLayer", bunnyLDB, self.db.profile.minimap)
+
+    C_ChatInfo.RegisterAddonMessagePrefix("AutoLayer")
+    C_Timer.After(2, function()
+        AutoLayer:HopGUI()
+    end)
 end
 
 function AutoLayer:DebugPrint(...)

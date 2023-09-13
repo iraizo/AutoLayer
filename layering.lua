@@ -43,20 +43,6 @@ function AutoLayer:ProcessMessage(event, msg, name)
 
             self:DebugPrint("Matched trigger", trigger, "in message", msg)
 
-            -- check if group is full
-            if self.db.profile.autokick and GetNumGroupMembers() == 5 then
-                self:DebugPrint("Group is full, kicking")
-
-                -- kick first member after group leader
-                for i = 1, GetNumGroupMembers() do
-                    if UnitIsGroupLeader("player") and i ~= 1 then
-                        kick_player = GetRaidRosterInfo(i)
-                    end
-                end
-
-                return
-            end
-
             -- check if we've already invited this player in the last 5 minutes
             if event ~= "CHAT_MSG_WHISPER" then
                 for i, player in ipairs(player_cache) do
@@ -84,6 +70,20 @@ function AutoLayer:ProcessMessage(event, msg, name)
 
             ---@diagnostic disable-next-line: undefined-global
             InviteUnit(name)
+
+            -- check if group is full
+            if self.db.profile.autokick and GetNumGroupMembers() >= 4 then
+                self:DebugPrint("Group is full, kicking")
+
+                -- kick first member after group leader
+                for i = 4, GetNumGroupMembers() do
+                    if UnitIsGroupLeader("player") and i ~= 1 then
+                        kick_player = GetRaidRosterInfo(i)
+                    end
+                end
+
+                return
+            end
 
             return
         end
