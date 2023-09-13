@@ -63,14 +63,9 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
             end
         end
 
-        --d  print(layers)
         return
     end
 
-    -- TODO: remove this before launch again
-    if true then
-        return
-    end
 
     local triggers = AutoLayer:ParseTriggers()
 
