@@ -179,9 +179,9 @@ function JoinHoppingChannel()
     JoinChannelByName("AutoLayer", "autolayer")
     local channel_num = GetChannelName("AutoLayer")
     if channel_num == 0 then
-        print("Failed to join death alerts channel")
+        print("Failed to AutoLayer channel")
     else
-        print("Successfully joined deathlog channel.")
+        print("Successfully joined AutoLayer channel.")
     end
 
     for i = 1, 10 do
