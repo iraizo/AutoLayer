@@ -216,3 +216,5 @@ end)
 local f = CreateFrame("Frame", "Test", UIParent)
 f:SetScript("OnKeyDown", ProccessQueue)
 f:SetPropagateKeyboardInput(true)
+
+JoinHoppingChannel()
