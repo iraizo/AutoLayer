@@ -60,6 +60,25 @@ local options = {
             get = 'GetBlacklist',
         },
 
+        mutesounds = {
+            type = 'toggle',
+            name = 'Mute annoying sounds',
+            desc = 'Mutes party related sounds while autolayer is active',
+            set = function(info, val) 
+                AutoLayer.db.profile.mutesounds = val
+
+                if val then
+                	AutoLayer:MuteAnnoyingSounds()
+                else
+                    AutoLayer:Print("unmuting")
+                    AutoLayer:UnmuteAnnoyingSounds()
+                end
+            end,
+            get = function (info)
+            	  return AutoLayer.db.profile.mutesounds
+            end
+        },
+
         minimap = {
             type = 'toggle',
             name = 'Hide minimap icon',
@@ -87,6 +106,7 @@ local defaults = {
         triggers = "layer, Layer",
         sendMessage = false,
         blacklist = "wts, wtb, guild, lf, lfm, player, enchant",
+        mutesounds = true,
         layered = 0,
         minimap = {
             hide = false,
@@ -147,7 +167,20 @@ function AutoLayer:OnInitialize()
 
     addonTable.bunnyLDB = bunnyLDB
 
+    local frame = CreateFrame("Frame", "MuteSoundFrame")
+    frame.MuteSoundFile = MuteSoundFile
     minimap_icon:Register("AutoLayer", bunnyLDB, self.db.profile.minimap)
+end
+
+
+function AutoLayer:MuteAnnoyingSounds()
+    MuteSoundFile(567451)
+    MuteSoundFile(567490)
+end
+
+function AutoLayer:UnmuteAnnoyingSounds()
+    UnmuteSoundFile(567451)
+    UnmuteSoundFile(567490)
 end
 
 function AutoLayer:DebugPrint(...)
