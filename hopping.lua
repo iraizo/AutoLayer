@@ -9,11 +9,11 @@ local selected_layers = {}
 local is_closed = true
 
 function AutoLayer:SendLayerRequest()
-  local compressed = addonTable.LibDeflate:CompressDeflate(addonTable.LibSerialize:Serialize(selected_layers))
-  -- if anyone knows how to make this UTF-8 compliant (any other encoding func, this would be helpful)
-  local encoded = addonTable.LibDeflate:EncodeForPrint(compressed)
-  AutoLayer:Print(selected_layers)
-  table.insert(addonTable.send_queue, encoded)
+  local res = "LFL "
+  res = res .. table.concat(selected_layers, ",")
+
+  table.insert(addonTable.send_queue, res)
+  AutoLayer:DebugPrint("Sending layer request: " .. res)
 end
 
 function AutoLayer:HopGUI()
@@ -26,6 +26,7 @@ function AutoLayer:HopGUI()
   frame:SetTitle("AutoLayer - Hopper")
   -- make frame as small as possible
   frame:SetWidth(300)
+  AutoLayer:DebugPrint(res)
   frame:SetHeight(200)
   frame:SetStatusText("Beta feature")
 
@@ -54,10 +55,6 @@ function AutoLayer:HopGUI()
   send:SetText("Send")
   send:SetWidth(100)
   send:SetCallback("OnClick", function()
-    for _, v in ipairs(selected_layers) do
-      AutoLayer:DebugPrint(v)
-    end
-
     AutoLayer:SendLayerRequest()
   end)
 
@@ -78,12 +75,9 @@ function AutoLayer:HopGUI()
     table.insert(selected_layers, v)
   end)
 
-  -- add space between button and desc
-
-
   local desc = AceGUI:Create("Label")
   desc:SetText(
-    "This sends a layer hop request to other addon users. If they are on the selected layer, they will invite you to their group.\ntest");
+    "This feature is still in beta, feedback is appreciated.\n This will send a message into the lookingforgroup channel where autolayer users will respond accordingly.\n|cFF00FF00This should now be fixed!|r");
 
   frame:AddChild(layer)
   frame:AddChild(send)

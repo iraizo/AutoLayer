@@ -28,42 +28,25 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
         return
     end
 
+    if addonTable.NWB ~= nil then
+        local message = ({ strsplit(" ", msg) })
 
-    if channel:match(addonName) and addonTable.NWB ~= nil and addonTable.NWB.currentLayer ~= nil then
-        local payload = addonTable.LibDeflate:DecodeForPrint(msg)
-
-        if payload == nil then
-            AutoLayer:DebugPrint("Failed to decode layer request")
-            return
-        end
-
-        local decompressed = addonTable.LibDeflate:DecompressDeflate(payload)
-
-        if decompressed == nil then
-            AutoLayer:DebugPrint("Failed to decompress layer request")
-            return
-        end
-
-        local success, layers = addonTable.LibSerialize:Deserialize(decompressed)
-
-        if not success then
-            AutoLayer:DebugPrint("Failed to decode layer request")
-            return
-        end
-
-        AutoLayer:DebugPrint("Received layer request (encoded): " .. payload)
-        AutoLayer:DebugPrint("Player " .. name .. " requested layer" .. table.concat(layers, ", "))
-        for _, layer in ipairs(layers) do
-            if layer == addonTable.NWB.currentLayer then
-                InviteUnit(name)
-                CTL:SendChatMessage("NORMAL", name, "[AutoLayer] invited to layer " .. addonTable.NWB.currentLayer,
-                    "WHISPER", nil,
-                    name)
-                return
+        if message[1] == "LFL" then
+            local requested_layers = ({ strsplit(",", message[2]) })
+            for _, v in pairs(requested_layers) do
+                if tonumber(v) == addonTable.NWB.currentLayer then
+                    AutoLayer:DebugPrint("Inviting " .. name)
+                    InviteUnit(name)
+                    if self.db.profile.whisper then
+                        CTL:SendChatMessage("NORMAL", name,
+                            "[AutoLayer] invited to layer " .. addonTable.NWB.currentLayer,
+                            "WHISPER", nil,
+                            name)
+                        return
+                    end
+                end
             end
         end
-
-        return
     end
 
 
@@ -175,18 +158,18 @@ AutoLayer:RegisterEvent("CHAT_MSG_WHISPER", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_GUILD", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_SYSTEM", "ProcessSystemMessages")
 
-function JoinHoppingChannel()
-    JoinChannelByName("AutoLayer", "autolayer")
-    local channel_num = GetChannelName("AutoLayer")
+function JoinLFGChannel()
+    JoinChannelByName("LookingForGroup")
+    local channel_num = GetChannelName("LookingForGroup")
     if channel_num == 0 then
-        print("Failed to AutoLayer channel")
+        print("Failed to join LookingForGroup channel")
     else
-        print("Successfully joined AutoLayer channel.")
+        print("Successfully joined LookingForGroup channel.")
     end
 
     for i = 1, 10 do
         if _G['ChatFrame' .. i] then
-            ChatFrame_RemoveChannel(_G['ChatFrame' .. i], "AutoLayers")
+            ChatFrame_RemoveChannel(_G['ChatFrame' .. i], "LookingForGroup")
         end
     end
 end
@@ -194,15 +177,13 @@ end
 function ProccessQueue()
     if #addonTable.send_queue > 0 then
         local payload = table.remove(addonTable.send_queue, 1)
-        local channel_num = GetChannelName("AutoLayer")
+        local channel_num = GetChannelName("LookingForGroup")
         if channel_num == 0 then
-            JoinHoppingChannel()
-            return
+            JoinLFGChannel()
+            do return end
         end
 
-        AutoLayer:DebugPrint("Sent layer request (encoded): " .. payload)
-
-        CTL:SendChatMessage("BULK", "AutoLayer", payload, "CHANNEL", nil, channel_num)
+        CTL:SendChatMessage("BULK", "LookingForGroup", payload, "CHANNEL", nil, channel_num)
     end
 end
 
@@ -216,5 +197,3 @@ end)
 local f = CreateFrame("Frame", "Test", UIParent)
 f:SetScript("OnKeyDown", ProccessQueue)
 f:SetPropagateKeyboardInput(true)
-
-JoinHoppingChannel()

@@ -37,6 +37,18 @@ local options = {
             get = 'GetTriggers',
         },
 
+        whisper = {
+            type = 'toggle',
+            name = 'Send whisper',
+            desc = 'Sends a whisper to the player when successfully inviting them with the layer number',
+            set = function (info, val)
+                AutoLayer.db.profile.whisper = val
+            end,
+            get = function (info)
+                return AutoLayer.db.profile.whisper
+            end
+        },
+
         autokick = {
             type = 'toggle',
             name = 'Auto kick',

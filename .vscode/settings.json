@@ -53,10 +53,39 @@
         "time",
         "UnitIsGroupLeader",
         "GetRaidRosterInfo",
-        "InterfaceOptionsFrame_OpenToCategory"
+        "InterfaceOptionsFrame_OpenToCategory",
+        "UIParent",
+        "JoinChannelByName",
+        "CreateFrame",
+        "GetChannelName",
+        "print",
+        "loadstring",
+        "next",
+        "tostring",
+        "select",
+        "pairs",
+        "type",
+        "unpack",
+        "assert",
+        "error",
+        "setmetatable",
+        "getmetatable",
+        "rawset",
+        "rawget",
+        "tonumber",
+        "Ambiguate",
+        "pcall",
+        "UnitClass",
+        "GameTooltip",
+        "Minimap",
+        "WOW_PROJECT_ID",
+        "WOW_PROJECT_MAINLINE",
+        "rawequal"
     ],
     "Lua.diagnostics.disable": [
         "undefined-field",
-        "inject-field"
+        "inject-field",
+        "missing-parameter",
+        "redundant-parameter"
     ]
 }
