@@ -30,6 +30,14 @@ function AutoLayer:HopGUI()
   frame:SetHeight(200)
   frame:SetStatusText("Beta feature")
 
+  if addonTable.NWB == nil then
+    -- add text to frame
+    local desc = AceGUI:Create("Label")
+    desc:SetText("You need to have the NovaWorldBuffs addon installed to use this feature.")
+    frame:AddChild(desc)
+    return
+  end
+
   frame:SetCallback("OnClose", function()
     is_closed = true
   end)
