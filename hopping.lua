@@ -40,6 +40,7 @@ function AutoLayer:HopGUI()
 
   frame:SetCallback("OnClose", function()
     is_closed = true
+    selected_layers = {}
   end)
 
   -- multi combo box
