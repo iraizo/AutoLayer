@@ -30,7 +30,7 @@ end
 
 function AutoLayer:ParseTriggers()
     local triggers = {}
-    for trigger in string.gmatch(self.db.profile.triggers, "[^,]+") do
+    for trigger in string.gmatch(self.db.profile.triggers, "%a+") do
         table.insert(triggers, trigger)
     end
     return triggers

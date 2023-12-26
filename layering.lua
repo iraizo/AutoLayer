@@ -4,6 +4,16 @@ local CTL = _G.ChatThrottleLib
 local player_cache = {}
 local kick_player = nil
 
+local function containsNumber(str, value)
+    for v in string.gmatch(str, "%d+") do
+        if tonumber(value) == tonumber(v) then
+            return true
+        end
+    end
+    return false
+end
+
+
 C_Timer.After(0.1, function()
     for name in LibStub("AceAddon-3.0"):IterateAddons() do
         if name == "NovaWorldBuffs" then
@@ -28,32 +38,10 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
         return
     end
 
-    if addonTable.NWB ~= nil then
-        local message = ({ strsplit(" ", msg) })
-
-        if message[1] == "LFL" then
-            local requested_layers = ({ strsplit(",", message[2]) })
-            for _, v in pairs(requested_layers) do
-                if tonumber(v) == addonTable.NWB.currentLayer then
-                    AutoLayer:DebugPrint("Inviting " .. name)
-                    InviteUnit(name)
-                    if self.db.profile.whisper then
-                        CTL:SendChatMessage("NORMAL", name,
-                            "[AutoLayer] invited to layer " .. addonTable.NWB.currentLayer,
-                            "WHISPER", nil,
-                            name)
-                        return
-                    end
-                end
-            end
-        end
-    end
-
-
     local triggers = AutoLayer:ParseTriggers()
 
     for _, trigger in ipairs(triggers) do
-        if string.find(string.lower(msg), "%f[%a]layer%f[%A]") then
+        if string.find(string.lower(msg), "%f[%a]"..string.lower(trigger).."%f[%A]") then
             -- much efficency, much wow!
             local blacklist = AutoLayer:ParseBlacklist()
             for _, black in ipairs(blacklist) do
@@ -64,6 +52,19 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
             end
 
             self:DebugPrint("Matched trigger", trigger, "in message", msg)
+            if string.find(msg, "%d+") then
+                self:DebugPrint(name, "requested specific layer", msg)
+                if string.find(string.lower(msg), "not.-%d+") then
+                    self:DebugPrint(name, "contains 'not' in layer request, ignoring for now:", msg)
+                    return
+                end
+                if not containsNumber(msg, addonTable.NWB.currentLayer) then
+                    self:DebugPrint(name, "layer condition unsatisfied:", msg)
+                    self:DebugPrint("Current layer:", addonTable.NWB.currentLayer)
+                    return
+                end
+                self:DebugPrint(name, "layer condition satisfied", msg)
+            end
 
             -- check if we've already invited this player in the last 5 minutes
             if event ~= "CHAT_MSG_WHISPER" then
@@ -133,7 +134,7 @@ function AutoLayer:ProcessSystemMessages(_, a)
     end
 
     if segments[3] == "invited" then
-        if addonTable.NWB ~= nil and addonTable.NWB.currentLayer ~= 0 then
+        if addonTable.NWB ~= nil and addonTable.NWB.currentLayer ~= 0 and self.db.profile.whisper == true then
             CTL:SendChatMessage("NORMAL", segments[4], "[AutoLayer] invited to layer " .. addonTable.NWB.currentLayer,
                 "WHISPER", nil,
                 segments[4])
