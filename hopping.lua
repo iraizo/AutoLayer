@@ -9,7 +9,7 @@ local selected_layers = {}
 local is_closed = true
 
 function AutoLayer:SendLayerRequest()
-  local res = "LFL "
+  local res = "inv layer "
   res = res .. table.concat(selected_layers, ",")
 
   table.insert(addonTable.send_queue, res)

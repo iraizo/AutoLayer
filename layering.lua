@@ -159,18 +159,18 @@ AutoLayer:RegisterEvent("CHAT_MSG_WHISPER", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_GUILD", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_SYSTEM", "ProcessSystemMessages")
 
-function JoinLFGChannel()
-    JoinChannelByName("LookingForGroup")
-    local channel_num = GetChannelName("LookingForGroup")
+function JoinLayerChannel()
+    JoinChannelByName("layer")
+    local channel_num = GetChannelName("layer")
     if channel_num == 0 then
-        print("Failed to join LookingForGroup channel")
+        print("Failed to join Layer channel")
     else
-        print("Successfully joined LookingForGroup channel.")
+        print("Successfully joined Layer channel.")
     end
 
     for i = 1, 10 do
         if _G['ChatFrame' .. i] then
-            ChatFrame_RemoveChannel(_G['ChatFrame' .. i], "LookingForGroup")
+            ChatFrame_RemoveChannel(_G['ChatFrame' .. i], "layer")
         end
     end
 end
@@ -178,13 +178,12 @@ end
 function ProccessQueue()
     if #addonTable.send_queue > 0 then
         local payload = table.remove(addonTable.send_queue, 1)
-        local channel_num = GetChannelName("LookingForGroup")
-        if channel_num == 0 then
-            JoinLFGChannel()
+        local l_channel_num = GetChannelName("layer")
+        if l_channel_num == 0 then
+            JoinLayerChannel()
             do return end
         end
-
-        CTL:SendChatMessage("BULK", "LookingForGroup", payload, "CHANNEL", nil, channel_num)
+        CTL:SendChatMessage("BULK", "layer", payload, "CHANNEL", nil, l_channel_num)
     end
 end
 
