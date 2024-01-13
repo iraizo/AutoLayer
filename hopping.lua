@@ -11,7 +11,7 @@ local is_closed = true
 function AutoLayer:SendLayerRequest()
   local res = "LFL "
   res = res .. table.concat(selected_layers, ",")
-
+  LeaveParty()
   table.insert(addonTable.send_queue, res)
   AutoLayer:DebugPrint("Sending layer request: " .. res)
 end
