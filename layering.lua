@@ -65,7 +65,7 @@ local function parseLayers(message)
     -- Sort layers
     table.sort(layers)
 
-    -- Remove duplicates
+    -- Make a new list without duplicates (this code assumes the list is already sorted)
     local uniqueLayers = {}
     uniqueLayers[1] = layers[1]
     for i = 2, #layers do
@@ -78,6 +78,7 @@ local function parseLayers(message)
 end
 
 
+ -- Autoexec?
 C_Timer.After(0.1, function()
     for name in LibStub("AceAddon-3.0"):IterateAddons() do
         if name == "NovaWorldBuffs" then
@@ -98,9 +99,9 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
     end
 
     local name_without_realm = ({ strsplit("-", name) })[1]
-    --if name_without_realm == UnitName("player") then
-    --    return
-    --end
+    if name_without_realm == UnitName("player") then
+        return
+    end
 
     local triggerMatch = containsAnyWordFromList(msg, AutoLayer:ParseTriggers(), true)
     if not triggerMatch then
