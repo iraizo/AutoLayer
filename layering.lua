@@ -77,6 +77,10 @@ local function parseLayers(message)
     return uniqueLayers
 end
 
+ -- Placeholder until this is refined a bit
+local function getCurrentLayer()
+    return addonTable.NWB.currentLayer
+end
 
  -- Autoexec?
 C_Timer.After(0.1, function()
@@ -117,8 +121,20 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
     -- If we got this far, we have a valid match.
     self:DebugPrint("Matched trigger: '", triggerMatch, "' in message: '", msg, "' from player '", name_without_realm, "'")
 
-    if string.find(msg, "%d+") then
-        self:DebugPrint(name, "requested specific layer", msg)
+    if string.find(msg, "%d+") then -- Uh oh, this player is picky and wants a specific layer!
+        local currentLayer = getCurrentLayer()
+        if not currentLayer or currentLayer <= 0 then
+            self:DebugPrint("Message requested a specific layer, but we don't know what layer we're in!")
+            return
+        end
+        local requestedLayers = parseLayers(msg)
+        if not requestedLayers or next(requestedLayers) == nil then
+            self:DebugPrint("Message requested a specific layer, but we couldn't parse the message successfully!")
+            return
+        end
+
+        self:DebugPrint("Message requested layers:", table.concat(requestedLayers, ", "))
+        
         if string.find(string.lower(msg), "not.-%d+") then
             self:DebugPrint(name, "contains 'not' in layer request, ignoring for now:", msg)
             return
