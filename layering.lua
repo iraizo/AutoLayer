@@ -4,15 +4,42 @@ local CTL = _G.ChatThrottleLib
 local player_cache = {}
 local kick_player = nil
 
-local function containsNumber(str, value)
-    for v in string.gmatch(str, "%d+") do
-        if tonumber(value) == tonumber(v) then
+local function containsNumber(str, number)
+    for match in string.gmatch(str, "%d+") do
+        if tonumber(number) == tonumber(match) then
             return true
         end
     end
     return false
 end
 
+--- Checks if a message contains any word from a given list, with an option to respect word boundaries.
+-- @param msg The message to search through.
+-- @param listOfWords A list of words to search for in the message.
+-- @param respectWordBoundaries (optional) Whether to respect word boundaries in the search. Defaults to true.
+-- @return The first word found in the message that matches a word from the list; false otherwise.
+local function containsAnyWordFromList(msg, listOfWords, respectWordBoundaries)
+    -- Default to true if not explicitly set
+    respectWordBoundaries = respectWordBoundaries ~= false
+    local lowerMsg = string.lower(msg)
+
+    for _, word in ipairs(listOfWords) do
+        local lowerWord = string.lower(word)
+        local pattern
+
+        if respectWordBoundaries then
+            pattern = "%f[%a]" .. lowerWord .. "%f[%A]"
+        else
+            pattern = lowerWord
+        end
+
+        if string.find(lowerMsg, pattern) then
+            return word -- Return the matched word
+        end
+    end
+
+    return false -- Return false if nothing matched 
+end
 
 C_Timer.After(0.1, function()
     for name in LibStub("AceAddon-3.0"):IterateAddons() do
@@ -34,82 +61,78 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
     end
 
     local name_without_realm = ({ strsplit("-", name) })[1]
-    if name_without_realm == UnitName("player") then
+    --if name_without_realm == UnitName("player") then
+    --    return
+    --end
+
+    local triggerMatch = containsAnyWordFromList(msg, AutoLayer:ParseTriggers(), true)
+    if not triggerMatch then
         return
     end
 
-    local triggers = AutoLayer:ParseTriggers()
+    local blacklistMatch = containsAnyWordFromList(msg, AutoLayer:ParseBlacklist(), false)
+    if blacklistMatch then
+        self:DebugPrint("Matched blacklist: '", blacklistMatch, "' in message: '", msg, "' from player '", name_without_realm, "'")
+        return
+    end
 
-    for _, trigger in ipairs(triggers) do
-        if string.find(string.lower(msg), "%f[%a]"..string.lower(trigger).."%f[%A]") then
-            -- much efficency, much wow!
-            local blacklist = AutoLayer:ParseBlacklist()
-            for _, black in ipairs(blacklist) do
-                if string.match(string.lower(msg), string.lower(black)) then
-                    self:DebugPrint("Matched blacklist", black, "in message", msg)
-                    return
-                end
-            end
+    -- If we got this far, we have a valid match.
+    self:DebugPrint("Matched trigger: '", triggerMatch, "' in message: '", msg, "' from player '", name_without_realm, "'")
 
-            self:DebugPrint("Matched trigger", trigger, "in message", msg)
-            if string.find(msg, "%d+") then
-                self:DebugPrint(name, "requested specific layer", msg)
-                if string.find(string.lower(msg), "not.-%d+") then
-                    self:DebugPrint(name, "contains 'not' in layer request, ignoring for now:", msg)
-                    return
-                end
-                if not containsNumber(msg, addonTable.NWB.currentLayer) then
-                    self:DebugPrint(name, "layer condition unsatisfied:", msg)
-                    self:DebugPrint("Current layer:", addonTable.NWB.currentLayer)
-                    return
-                end
-                self:DebugPrint(name, "layer condition satisfied", msg)
-            end
-
-            -- check if we've already invited this player in the last 5 minutes
-            if event ~= "CHAT_MSG_WHISPER" then
-                for i, player in ipairs(player_cache) do
-                    -- delete players from cache that are over 5 minutes old
-                    if player.time + 300 < time() then
-                        self:DebugPrint("Removing ", player.name, " from cache")
-                        table.remove(player_cache, i)
-                    end
-
-                    --self:DebugPrint("Checking ", player.name, " against ", name)
-                    --self:DebugPrint("Time: ", player.time, " + 300 < ", time(), " = ", player.time + 300 < time())
-
-                    local player_name_without_realm = ({ strsplit("-", player.name) })[1]
-
-                    -- dont invite player if they got invited in the last 5 minutes
-
-                    if player.name == name_without_realm or player_name_without_realm == name_without_realm and player.time + 300 > time() then
-                        self:DebugPrint("Already invited", name, "in the last 5 minutes")
-                        return
-                    end
-                end
-            end
-
-            --end
-
-            ---@diagnostic disable-next-line: undefined-global
-            InviteUnit(name)
-
-            -- check if group is full
-            if self.db.profile.autokick and GetNumGroupMembers() >= 4 then
-                self:DebugPrint("Group is full, kicking")
-
-                -- kick first member after group leader
-                for i = 4, GetNumGroupMembers() do
-                    if UnitIsGroupLeader("player") and i ~= 1 then
-                        kick_player = GetRaidRosterInfo(i)
-                    end
-                end
-
-                return
-            end
-
+    if string.find(msg, "%d+") then
+        self:DebugPrint(name, "requested specific layer", msg)
+        if string.find(string.lower(msg), "not.-%d+") then
+            self:DebugPrint(name, "contains 'not' in layer request, ignoring for now:", msg)
             return
         end
+        if not containsNumber(msg, addonTable.NWB.currentLayer) then
+            self:DebugPrint(name, "layer condition unsatisfied:", msg)
+            self:DebugPrint("Current layer:", addonTable.NWB.currentLayer)
+            return
+        end
+        self:DebugPrint(name, "layer condition satisfied", msg)
+    end
+
+    -- check if we've already invited this player in the last 5 minutes
+    if event ~= "CHAT_MSG_WHISPER" then
+        for i, player in ipairs(player_cache) do
+            -- delete players from cache that are over 5 minutes old
+            if player.time + 300 < time() then
+                self:DebugPrint("Removing ", player.name, " from cache")
+                table.remove(player_cache, i)
+            end
+
+            --self:DebugPrint("Checking ", player.name, " against ", name)
+            --self:DebugPrint("Time: ", player.time, " + 300 < ", time(), " = ", player.time + 300 < time())
+
+            local player_name_without_realm = ({ strsplit("-", player.name) })[1]
+
+            -- dont invite player if they got invited in the last 5 minutes
+
+            if player.name == name_without_realm or player_name_without_realm == name_without_realm and player.time + 300 > time() then
+                self:DebugPrint("Already invited", name, "in the last 5 minutes")
+                return
+            end
+        end
+    end
+
+    --end
+
+    ---@diagnostic disable-next-line: undefined-global
+    InviteUnit(name)
+
+    -- check if group is full
+    if self.db.profile.autokick and GetNumGroupMembers() >= 4 then
+        self:DebugPrint("Group is full, kicking")
+
+        -- kick first member after group leader
+        for i = 4, GetNumGroupMembers() do
+            if UnitIsGroupLeader("player") and i ~= 1 then
+                kick_player = GetRaidRosterInfo(i)
+            end
+        end
+
+        return
     end
 end
 
