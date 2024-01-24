@@ -41,6 +41,43 @@ local function containsAnyWordFromList(msg, listOfWords, respectWordBoundaries)
     return false -- Return false if nothing matched 
 end
 
+--- Extracts unique, sorted layer numbers from a message.
+-- Identifies individual and ranged layer numbers (e.g., "1", "1-3") in a message,
+-- compiling them into a sorted list without duplicates.
+--
+-- @param message string The input string containing layer numbers.
+-- @return table List of sorted, unique layer numbers.
+local function parseLayers(message)
+    local layers = {}
+
+    -- Add individual layers
+    for num in string.gmatch(message, "%d+") do
+        layers[#layers + 1] = tonumber(num)
+    end
+
+    -- Expand ranges
+    for rangeStart, rangeEnd in string.gmatch(message, "(%d+)%-(%d+)") do
+        for i = tonumber(rangeStart), tonumber(rangeEnd) do
+            layers[#layers + 1] = i
+        end
+    end
+
+    -- Sort layers
+    table.sort(layers)
+
+    -- Remove duplicates
+    local uniqueLayers = {}
+    uniqueLayers[1] = layers[1]
+    for i = 2, #layers do
+        if layers[i] ~= layers[i - 1] then
+            uniqueLayers[#uniqueLayers + 1] = layers[i]
+        end
+    end
+
+    return uniqueLayers
+end
+
+
 C_Timer.After(0.1, function()
     for name in LibStub("AceAddon-3.0"):IterateAddons() do
         if name == "NovaWorldBuffs" then
