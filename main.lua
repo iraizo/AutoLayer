@@ -37,15 +37,27 @@ local options = {
             get = 'GetTriggers',
         },
 
-        whisper = {
+        inviteWhisper = {
             type = 'toggle',
-            name = 'Send whisper',
-            desc = 'Sends a whisper to the player when successfully inviting them with the layer number',
+            name = 'Whisper when inviting',
+            desc = 'Sends a whisper to the player when inviting them, telling what layer you are inviting them to.',
             set = function (info, val)
-                AutoLayer.db.profile.whisper = val
+                AutoLayer.db.profile.inviteWhisper = val
             end,
             get = function (info)
-                return AutoLayer.db.profile.whisper
+                return AutoLayer.db.profile.inviteWhisper
+            end
+        },
+
+        inviteWhisperTemplate = {
+            type = 'input',
+            name = 'Invite whisper template',
+            desc = 'This the template of the whisper that will be sent on invite, if enabled. \'%s\' will be replaced by the layer\'s number.',
+            set = function (info, val)
+                AutoLayer.db.profile.inviteWhisperTemplate = val
+            end,
+            get = function (info)
+                return AutoLayer.db.profile.inviteWhisperTemplate
             end
         },
 
@@ -127,6 +139,7 @@ local defaults = {
         sendMessage = false,
         blacklist = "wts,wtb,guild,lfm,player,enchant",
         invertKeywords = "not,off,except,but,out",
+        inviteWhisperTemplate = "Inviting you to layer %s...",
         mutesounds = true,
         layered = 0,
         minimap = {

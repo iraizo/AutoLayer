@@ -228,10 +228,14 @@ function AutoLayer:ProcessSystemMessages(_, a)
     end
 
     if segments[3] == "invited" then
-        if addonTable.NWB ~= nil and addonTable.NWB.currentLayer ~= 0 and self.db.profile.whisper == true then
-            CTL:SendChatMessage("NORMAL", segments[4], "[AutoLayer] invited to layer " .. addonTable.NWB.currentLayer,
-                "WHISPER", nil,
-                segments[4])
+        if self.db.profile.inviteWhisper == true then
+            local currentLayer = getCurrentLayer()
+            if currentLayer ~= 0 then
+                local finalMessage = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplate, currentLayer)
+                CTL:SendChatMessage("NORMAL", segments[4], finalMessage,
+                    "WHISPER", nil,
+                    segments[4])
+            end
         end
     end
 end
