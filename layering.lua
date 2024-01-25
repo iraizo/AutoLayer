@@ -13,6 +13,15 @@ local function containsNumber(str, number)
     return false
 end
 
+function isNumberInList(number, list)
+    for index, value in ipairs(list) do
+        if value == number then
+            return true
+        end
+    end
+    return false
+end
+
 --- Checks if a message contains any word from a given list, with an option to respect word boundaries.
 -- @param msg The message to search through.
 -- @param listOfWords A list of words to search for in the message.
