@@ -77,7 +77,6 @@ local function parseLayers(message)
         end
     end
 
-
     -- Sort layers
     table.sort(layers)
 
@@ -95,7 +94,7 @@ end
 
  -- Placeholder until this is refined a bit
 local function getCurrentLayer()
-    return addonTable.NWB.currentLayer
+    return tonumber(addonTable.NWB.currentLayer)
 end
 
  -- Autoexec?
@@ -149,18 +148,20 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
             return
         end
 
-        self:DebugPrint("Message requested layers:", table.concat(requestedLayers, ", "))
-        
-        if string.find(string.lower(msg), "not.-%d+") then
-            self:DebugPrint(name, "contains 'not' in layer request, ignoring for now:", msg)
+        local requestIsInverted = containsAnyWordFromList(msg, AutoLayer:ParseInvertKeywords(), false)
+        local currLayerMatchesRequest = isNumberInList(currentLayer, requestedLayers)
+
+        if requestIsInverted then
+            self:DebugPrint("Message requested any layers except:", table.concat(requestedLayers, ", "))
+        else
+            self:DebugPrint("Message requested layers:", table.concat(requestedLayers, ", "))
+        end
+
+        if (requestIsInverted and currLayerMatchesRequest) or (not requestIsInverted and not currLayerMatchesRequest) then
+            self:DebugPrint("Request not satisfied. We are in layer ", currentLayer)
             return
         end
-        if not containsNumber(msg, addonTable.NWB.currentLayer) then
-            self:DebugPrint(name, "layer condition unsatisfied:", msg)
-            self:DebugPrint("Current layer:", addonTable.NWB.currentLayer)
-            return
-        end
-        self:DebugPrint(name, "layer condition satisfied", msg)
+        --If we got this far, then the message is a valid layer request that we can fulfill.
     end
 
     -- check if we've already invited this player in the last 5 minutes

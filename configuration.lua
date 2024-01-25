@@ -19,6 +19,15 @@ function AutoLayer:GetEnabled(info)
     return self.db.profile.enabled
 end
 
+function AutoLayer:SetSendMessage(info, val)
+    AutoLayer:DebugPrint("SetSendMessage", info, val)
+    self.db.profile.sendMessage = val
+end
+
+function AutoLayer:GetSendMessage(info)
+    return self.db.profile.sendMessage
+end
+
 function AutoLayer:SetTriggers(info, val)
     AutoLayer:DebugPrint("SetTriggers", info, val)
     self.db.profile.triggers = val
@@ -36,15 +45,6 @@ function AutoLayer:ParseTriggers()
     return triggers
 end
 
-function AutoLayer:SetSendMessage(info, val)
-    AutoLayer:DebugPrint("SetSendMessage", info, val)
-    self.db.profile.sendMessage = val
-end
-
-function AutoLayer:GetSendMessage(info)
-    return self.db.profile.sendMessage
-end
-
 function AutoLayer:SetBlacklist(info, val)
     AutoLayer:DebugPrint("SetBlacklist", info, val)
     self.db.profile.blacklist = val
@@ -60,6 +60,23 @@ function AutoLayer:ParseBlacklist()
         table.insert(blacklist, trigger)
     end
     return blacklist
+end
+
+function AutoLayer:SetInvertKeywords(info, val)
+    AutoLayer:DebugPrint("SetInvertKeywords", info, val)
+    self.db.profile.invertKeywords = val
+end
+
+function AutoLayer:GetInvertKeywords(info)
+    return self.db.profile.invertKeywords
+end
+
+function AutoLayer:ParseInvertKeywords()
+    local invertKeywords = {}
+    for keyword in string.gmatch(self.db.profile.invertKeywords, "[^,]+") do
+        table.insert(invertKeywords, keyword)
+    end
+    return invertKeywords
 end
 
 local bunnyLDB = ...

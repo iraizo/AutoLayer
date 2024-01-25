@@ -32,7 +32,7 @@ local options = {
         triggers = {
             type = 'input',
             name = 'Triggers',
-            desc = 'The triggers that will cause the invite message to be sent, seperated by commas',
+            desc = 'If a message contains one of these words, it will cause AutoLayer to try to invite the player that sent it. Separated by comma, not comma and space. Matches whole words only.',
             set = 'SetTriggers',
             get = 'GetTriggers',
         },
@@ -54,7 +54,7 @@ local options = {
             name = 'Auto kick',
             -- add red text to desc "test"
             desc =
-            'Enable/Disable kicks the last member out if the group is full red \124cffFF0000You need to drag your mouse to trigger it due to an API restriction\124r',
+            'Enable/Disable kicks the last member out if the group is full. \124cffFF0000You need to drag your mouse to trigger it due to an API restriction.\124r',
             set = function(info, val)
                 AutoLayer.db.profile.autokick = val
             end,
@@ -67,9 +67,17 @@ local options = {
         blacklist = {
             type = 'input',
             name = 'Blacklist',
-            desc = 'The opposite of triggers, if it matches those words in a message it wont invite, seperated by commas',
+            desc = 'If a message contains one of these words, AutoLayer will ignore the message no matter what. Separated by comma, not comma and space.',
             set = 'SetBlacklist',
             get = 'GetBlacklist',
+        },
+
+        invertKeywords = {
+            type = 'input',
+            name = 'Invert Keywords',
+            desc = 'If a message contains one of these words, AutoLayer will treat the message as someone looking for an invite for any layer *except* the ones they listed. Separated by comma, not comma and space.',
+            set = 'SetInvertKeywords',
+            get = 'GetInvertKeywords',
         },
 
         mutesounds = {
@@ -118,6 +126,7 @@ local defaults = {
         triggers = "layer",
         sendMessage = false,
         blacklist = "wts,wtb,guild,lfm,player,enchant",
+        invertKeywords = "not,off,except,but,out",
         mutesounds = true,
         layered = 0,
         minimap = {
