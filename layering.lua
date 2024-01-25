@@ -55,12 +55,19 @@ local function parseLayers(message)
         layers[#layers + 1] = tonumber(num)
     end
 
-    -- Expand ranges
+    -- Expand ranges, e.g. "layer 1-3" is the same as "layer 1,2,3"
     for rangeStart, rangeEnd in string.gmatch(message, "(%d+)%-(%d+)") do
-        for i = tonumber(rangeStart), tonumber(rangeEnd) do
+        local startNum = tonumber(rangeStart)
+        local endNum = tonumber(rangeEnd)
+        -- but what if someone is a freak and says "layer 3-1" instead of "layer 1-3"?
+        if startNum > endNum then
+            startNum, endNum = endNum, startNum -- Swap values if out of order
+        end
+        for i = startNum, endNum do
             layers[#layers + 1] = i
         end
     end
+
 
     -- Sort layers
     table.sort(layers)
