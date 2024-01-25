@@ -139,7 +139,7 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
     if string.find(msg, "%d+") then -- Uh oh, this player is picky and wants a specific layer!
         local currentLayer = getCurrentLayer()
         if not currentLayer or currentLayer <= 0 then
-            self:DebugPrint("Message requested a specific layer, but we don't know what layer we're in!")
+            self:DebugPrint("Message requested a specific layer, but we don't know what layer we're in! NWB says: ", addonTable.NWB, addonTable.NWB.currentLayer)
             return
         end
         local requestedLayers = parseLayers(msg)
