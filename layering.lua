@@ -1,8 +1,19 @@
 local addonName, addonTable = ...;
 local CTL = _G.ChatThrottleLib
 
-local player_cache = {}
+local playersInvitedRecently = {}
+local recentLayerRequests = {}
 local kick_player = nil
+
+function AutoLayer:pruneCache()
+    for i, cachedPlayer in ipairs(playersInvitedRecently) do
+        -- delete players from cache that are over 5 minutes old
+        if cachedPlayer.time + 300 < time() then
+            self:DebugPrint("Removing ", cachedPlayer.name, " from cache")
+            table.remove(playersInvitedRecently, i)
+        end
+    end
+end
 
 local function containsNumber(str, number)
     for match in string.gmatch(str, "%d+") do
@@ -13,13 +24,17 @@ local function containsNumber(str, number)
     return false
 end
 
-function isNumberInList(number, list)
+local function isNumberInList(number, list)
     for index, value in ipairs(list) do
         if value == number then
             return true
         end
     end
     return false
+end
+
+local function removeRealmName(name)
+    return ({ strsplit("-", name) })[1]
 end
 
 --- Checks if a message contains any word from a given list, with an option to respect word boundaries.
@@ -117,7 +132,7 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
         return
     end
 
-    local name_without_realm = ({ strsplit("-", name) })[1]
+    local name_without_realm = removeRealmName(name)
     if name_without_realm == UnitName("player") then
         return
     end
@@ -161,36 +176,35 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
             self:DebugPrint("Request not satisfied. We are in layer ", currentLayer)
             return
         end
-        --If we got this far, then the message is a valid layer request that we can fulfill.
     end
+    --If we got this far, then the message is a valid layer request that we can fulfill.
 
     -- check if we've already invited this player in the last 5 minutes
-    if event ~= "CHAT_MSG_WHISPER" then
-        for i, player in ipairs(player_cache) do
-            -- delete players from cache that are over 5 minutes old
-            if player.time + 300 < time() then
-                self:DebugPrint("Removing ", player.name, " from cache")
-                table.remove(player_cache, i)
-            end
-
-            --self:DebugPrint("Checking ", player.name, " against ", name)
-            --self:DebugPrint("Time: ", player.time, " + 300 < ", time(), " = ", player.time + 300 < time())
-
-            local player_name_without_realm = ({ strsplit("-", player.name) })[1]
-
-            -- dont invite player if they got invited in the last 5 minutes
-
-            if player.name == name_without_realm or player_name_without_realm == name_without_realm and player.time + 300 > time() then
+    if event ~= "CHAT_MSG_WHISPER" then -- If someone whispers us, that's fair game, they clearly want in
+        AutoLayer:pruneCache()
+        for i, cachedPlayer in ipairs(playersInvitedRecently) do
+            if cachedPlayer.name == name_without_realm and cachedPlayer.time + 300 > time() then
                 self:DebugPrint("Already invited", name, "in the last 5 minutes")
                 return
             end
         end
     end
 
-    --end
 
     ---@diagnostic disable-next-line: undefined-global
-    InviteUnit(name)
+    InviteUnit(name) -- This specifically invites the player's name with realm, intended?
+
+    table.insert(recentLayerRequests, name_without_realm)
+    self:DebugPrint("Added", name_without_realm, "to list of recent layer requests, which is now: ")
+    C_Timer.After(60, function()
+        for i, listItem in ipairs(recentLayerRequests) do
+            if listItem == name_without_realm then
+                self:DebugPrint("Removed", name_without_realm, "from list of recent layer requests")
+                table.remove(recentLayerRequests, i)
+                break
+            end
+        end
+    end)
 
     -- check if group is full
     if self.db.profile.autokick and GetNumGroupMembers() >= 4 then
@@ -217,25 +231,61 @@ function AutoLayer:ProcessSystemMessages(_, a)
 
     -- X joins the party
     if segments[2] == "joins" then
-        self.db.profile.layered = self.db.profile.layered + 1
+        local playerNameWithoutRealm = removeRealmName(segments[1])
 
-        table.insert(player_cache, { name = segments[1], time = time() - 100 })
+        -- Add them to our total only if they actually asked for a layer
+        -- (this may be a normal player we're inviting for different reasons)
+        for i, cachedPlayerName in ipairs(recentLayerRequests) do
+            if cachedPlayerName == playerNameWithoutRealm then
+                self.db.profile.layered = self.db.profile.layered + 1
+                break -- Found the player, no need to continue checking
+            end
+        end
+
+        table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() - 100 })
     end
 
+    -- X declines your invite
     if segments[2] == "declines" then
-        table.insert(player_cache, { name = segments[1], time = time() })
-        self:DebugPrint("Adding ", segments[1], " to cache, reason: declined invite")
+        local playerNameWithoutRealm = removeRealmName(segments[1])
+        table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() }) --Extend this timer, they don't want in right now
+        self:DebugPrint("Adding ", playerNameWithoutRealm, " to cache, reason: declined invite")
     end
 
     if segments[3] == "invited" then
-        if self.db.profile.inviteWhisper == true then
+        local playerNameWithoutRealm = removeRealmName(segments[4])
+
+        if self.db.profile.inviteWhisper then
             local currentLayer = getCurrentLayer()
-            if currentLayer ~= 0 then
-                local finalMessage = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplate, currentLayer)
-                CTL:SendChatMessage("NORMAL", segments[4], finalMessage,
-                    "WHISPER", nil,
-                    segments[4])
+
+            -- I guess don't whisper people if we don't know what layer we're in?
+            if currentLayer == nil or currentLayer <= 0 then
+                self:DebugPrint("Not whispering since we don't know what layer we're in! (", currentLayer, ")")
+                return
             end
+
+            -- Don't whisper the player unless they specifically asked for a layer
+            -- (this may be a normal player we're inviting for different reasons)
+            self:DebugPrint("Checking if ", playerNameWithoutRealm, " asked for a layer recently...")
+            local isPlayerInvited = false
+            for i, cachedPlayerName in ipairs(recentLayerRequests) do
+                if cachedPlayerName == playerNameWithoutRealm then
+                    self:DebugPrint("Yup!")
+                    isPlayerInvited = true
+                    break -- Found the player, no need to continue checking
+                end
+            end
+
+            if not isPlayerInvited then
+                self:DebugPrint("Nope!")
+                return
+            end
+            -- Continue with the rest of the function if the player is in the list
+
+            local finalMessage = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplate, currentLayer)
+            CTL:SendChatMessage("NORMAL", segments[4], finalMessage,
+                "WHISPER", nil,
+                segments[4])
         end
     end
 end
