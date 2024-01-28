@@ -255,6 +255,8 @@ function AutoLayer:ProcessSystemMessages(_, a)
     if segments[3] == "invited" then
         local playerNameWithoutRealm = removeRealmName(segments[4])
 
+        if playerNameWithoutRealm == "you" then return end -- X has invited you to group
+
         if self.db.profile.inviteWhisper then
             local currentLayer = getCurrentLayer()
 
