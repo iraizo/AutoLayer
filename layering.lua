@@ -107,24 +107,33 @@ local function parseLayers(message)
     return uniqueLayers
 end
 
- -- Placeholder until this is refined a bit
-local function getCurrentLayer()
-    return tonumber(addonTable.NWB.currentLayer)
-end
-
- -- Autoexec?
-C_Timer.After(0.1, function()
+function AutoLayer:ScanLayerFromNWB()
     for name in LibStub("AceAddon-3.0"):IterateAddons() do
         if name == "NovaWorldBuffs" then
             addonTable.NWB = LibStub("AceAddon-3.0"):GetAddon("NovaWorldBuffs")
             return
         end
     end
+end
 
-    if addonTable.NWB == nil then
-        AutoLayer:Print("Could not find NovaWorldBuffs, disabling NovaWorldBuffs integration")
+function AutoLayer:getCurrentLayer()
+    if addonTable.NWB == nil then return end -- No NWB, nothing to do here
+    -- If our layer is missing again, try to re-scan it once.
+    if addonTable.NWB.currentLayer == nil or addonTable.NWB.currentLayer <= 0 then
+        AutoLayer:ScanLayerFromNWB()
     end
-end)
+    return tonumber(addonTable.NWB.currentLayer)
+end
+
+ -- Autoexec?
+C_Timer.After(0.1, 
+    function()
+        AutoLayer:ScanLayerFromNWB()
+        if addonTable.NWB == nil then
+            AutoLayer:Print("Could not find NovaWorldBuffs, disabling NovaWorldBuffs integration")
+        end
+    end
+)
 
 ---@diagnostic disable-next-line:inject-field
 function AutoLayer:ProcessMessage(event, msg, name, _, channel)
@@ -152,7 +161,7 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
     self:DebugPrint("Matched trigger: '", triggerMatch, "' in message: '", msg, "' from player '", name_without_realm, "'")
 
     if string.find(msg, "%d+") then -- Uh oh, this player is picky and wants a specific layer!
-        local currentLayer = getCurrentLayer()
+        local currentLayer = AutoLayer:getCurrentLayer()
         if not currentLayer or currentLayer <= 0 then
             self:DebugPrint("Message requested a specific layer, but we don't know what layer we're in! NWB says: ", addonTable.NWB, addonTable.NWB.currentLayer)
             return
@@ -233,16 +242,15 @@ function AutoLayer:ProcessSystemMessages(_, a)
     if segments[2] == "joins" then
         local playerNameWithoutRealm = removeRealmName(segments[1])
 
-        -- Add them to our total only if they actually asked for a layer
+        -- Do AutoLayer stuff only if they actually asked for a layer
         -- (this may be a normal player we're inviting for different reasons)
         for i, cachedPlayerName in ipairs(recentLayerRequests) do
             if cachedPlayerName == playerNameWithoutRealm then
                 self.db.profile.layered = self.db.profile.layered + 1
+                table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() - 100 })
                 break -- Found the player, no need to continue checking
             end
-        end
-
-        table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() - 100 })
+        end      
     end
 
     -- X declines your invite
@@ -258,7 +266,7 @@ function AutoLayer:ProcessSystemMessages(_, a)
         if playerNameWithoutRealm == "you" then return end -- X has invited you to group
 
         if self.db.profile.inviteWhisper then
-            local currentLayer = getCurrentLayer()
+            local currentLayer = AutoLayer:getCurrentLayer()
 
             -- I guess don't whisper people if we don't know what layer we're in?
             if currentLayer == nil or currentLayer <= 0 then
@@ -268,20 +276,18 @@ function AutoLayer:ProcessSystemMessages(_, a)
 
             -- Don't whisper the player unless they specifically asked for a layer
             -- (this may be a normal player we're inviting for different reasons)
-            self:DebugPrint("Checking if ", playerNameWithoutRealm, " asked for a layer recently...")
             local isPlayerInvited = false
             for i, cachedPlayerName in ipairs(recentLayerRequests) do
                 if cachedPlayerName == playerNameWithoutRealm then
-                    self:DebugPrint("Yup!")
                     isPlayerInvited = true
                     break -- Found the player, no need to continue checking
                 end
             end
 
             if not isPlayerInvited then
-                self:DebugPrint("Nope!")
                 return
             end
+
             -- Continue with the rest of the function if the player is in the list
 
             local finalMessage = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplate, currentLayer)

@@ -188,12 +188,13 @@ function AutoLayer:OnInitialize()
             tooltip:AddLine("Left-click to toggle AutoLayer")
             tooltip:AddLine("Right-click to hop layers")
             tooltip:AddLine("Layered " .. self.db.profile.layered .. " players")
-
+            
             if addonTable.NWB ~= nil then
-                if addonTable.NWB.currentLayer == 0 then
+                local currentLayer = AutoLayer:getCurrentLayer()
+                if currentLayer == 0 then
                     tooltip:AddLine("Current layer: unknown, target an NPC")
                 else
-                    tooltip:AddLine("Current layer: " .. addonTable.NWB.currentLayer)
+                    tooltip:AddLine("Current layer: " .. currentLayer)
                 end
             end
         end,
