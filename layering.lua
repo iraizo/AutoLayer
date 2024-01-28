@@ -195,7 +195,7 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
     InviteUnit(name) -- This specifically invites the player's name with realm, intended?
 
     table.insert(recentLayerRequests, name_without_realm)
-    self:DebugPrint("Added", name_without_realm, "to list of recent layer requests, which is now: ")
+    self:DebugPrint("Added", name_without_realm, "to list of recent layer requests, which is now: ", table.concat(recentLayerRequests, ", "))
     C_Timer.After(60, function()
         for i, listItem in ipairs(recentLayerRequests) do
             if listItem == name_without_realm then
