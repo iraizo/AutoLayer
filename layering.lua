@@ -5,6 +5,16 @@ local playersInvitedRecently = {}
 local recentLayerRequests = {}
 local kick_player = nil
 
+local function isPlayerLoggingOut()
+    for i = 1, STATICPOPUP_NUMDIALOGS do
+        local frame = _G["StaticPopup"..i]
+        if frame and frame:IsShown() and frame.which == "CAMP" then
+            return true
+        end
+    end
+    return false
+end
+
 function AutoLayer:pruneCache()
     for i, cachedPlayer in ipairs(playersInvitedRecently) do
         -- delete players from cache that are over 5 minutes old
@@ -137,7 +147,7 @@ C_Timer.After(0.1,
 
 ---@diagnostic disable-next-line:inject-field
 function AutoLayer:ProcessMessage(event, msg, name, _, channel)
-    if not self.db.profile.enabled then
+    if not self.db.profile.enabled or isPlayerLoggingOut() then
         return
     end
 
