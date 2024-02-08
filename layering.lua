@@ -1,115 +1,240 @@
 local addonName, addonTable = ...;
 local CTL = _G.ChatThrottleLib
 
-local player_cache = {}
+local playersInvitedRecently = {}
+local recentLayerRequests = {}
 local kick_player = nil
 
-local function containsNumber(str, value)
-    for v in string.gmatch(str, "%d+") do
-        if tonumber(value) == tonumber(v) then
+local function isPlayerLoggingOut()
+    for i = 1, STATICPOPUP_NUMDIALOGS do
+        local frame = _G["StaticPopup"..i]
+        if frame and frame:IsShown() and frame.which == "CAMP" then
             return true
         end
     end
     return false
 end
 
+function AutoLayer:pruneCache()
+    for i, cachedPlayer in ipairs(playersInvitedRecently) do
+        -- delete players that are over 5 minutes old
+        if cachedPlayer.time + 300 < time() then
+            self:DebugPrint("Removing ", cachedPlayer.name, " from players invited recently")
+            table.remove(playersInvitedRecently, i)
+        end
+    end
+    for i, cachedPlayer in ipairs(recentLayerRequests) do
+        -- delete players that are over 1 minute old
+        if cachedPlayer.time + 60 < time() then
+            self:DebugPrint("Removing ", cachedPlayer.name, " from recent layer requests")
+            table.remove(recentLayerRequests, i)
+        end
+    end
+end
 
-C_Timer.After(0.1, function()
+local function containsNumber(str, number)
+    for match in string.gmatch(str, "%d+") do
+        if tonumber(number) == tonumber(match) then
+            return true
+        end
+    end
+    return false
+end
+
+local function isNumberInList(number, list)
+    for index, value in ipairs(list) do
+        if value == number then
+            return true
+        end
+    end
+    return false
+end
+
+local function removeRealmName(name)
+    return ({ strsplit("-", name) })[1]
+end
+
+--- Checks if a message contains any word from a given list, with an option to respect word boundaries.
+-- @param msg The message to search through.
+-- @param listOfWords A list of words to search for in the message.
+-- @param respectWordBoundaries (optional) Whether to respect word boundaries in the search. Defaults to true.
+-- @return The first word found in the message that matches a word from the list; false otherwise.
+local function containsAnyWordFromList(msg, listOfWords, respectWordBoundaries)
+    -- Default to true if not explicitly set
+    respectWordBoundaries = respectWordBoundaries ~= false
+    local lowerMsg = string.lower(msg)
+
+    for _, word in ipairs(listOfWords) do
+        local lowerWord = string.lower(word)
+        local pattern
+
+        if respectWordBoundaries then
+            pattern = "%f[%a]" .. lowerWord .. "%f[%A]"
+        else
+            pattern = lowerWord
+        end
+
+        if string.find(lowerMsg, pattern) then
+            return word -- Return the matched word
+        end
+    end
+
+    return false -- Return false if nothing matched 
+end
+
+--- Extracts unique, sorted layer numbers from a message.
+-- Identifies individual and ranged layer numbers (e.g., "1", "1-3") in a message,
+-- compiling them into a sorted list without duplicates.
+--
+-- @param message string The input string containing layer numbers.
+-- @return table List of sorted, unique layer numbers.
+local function parseLayers(message)
+    local layers = {}
+
+    -- Add individual layers
+    for num in string.gmatch(message, "%d+") do
+        layers[#layers + 1] = tonumber(num)
+    end
+
+    -- Expand ranges, e.g. "layer 1-3" is the same as "layer 1,2,3"
+    for rangeStart, rangeEnd in string.gmatch(message, "(%d+)%-(%d+)") do
+        local startNum = tonumber(rangeStart)
+        local endNum = tonumber(rangeEnd)
+        -- but what if someone is a freak and says "layer 3-1" instead of "layer 1-3"?
+        if startNum > endNum then
+            startNum, endNum = endNum, startNum -- Swap values if out of order
+        end
+        for i = startNum, endNum do
+            layers[#layers + 1] = i
+        end
+    end
+
+    -- Sort layers
+    table.sort(layers)
+
+    -- Make a new list without duplicates (this code assumes the list is already sorted)
+    local uniqueLayers = {}
+    uniqueLayers[1] = layers[1]
+    for i = 2, #layers do
+        if layers[i] ~= layers[i - 1] then
+            uniqueLayers[#uniqueLayers + 1] = layers[i]
+        end
+    end
+
+    return uniqueLayers
+end
+
+function AutoLayer:ScanLayerFromNWB()
     for name in LibStub("AceAddon-3.0"):IterateAddons() do
         if name == "NovaWorldBuffs" then
             addonTable.NWB = LibStub("AceAddon-3.0"):GetAddon("NovaWorldBuffs")
             return
         end
     end
+end
 
-    if addonTable.NWB == nil then
-        AutoLayer:Print("Could not find NovaWorldBuffs, disabling NovaWorldBuffs integration")
+function AutoLayer:getCurrentLayer()
+    if addonTable.NWB == nil then return end -- No NWB, nothing to do here
+    -- If our layer is missing again, try to re-scan it once.
+    if addonTable.NWB.currentLayer == nil or addonTable.NWB.currentLayer <= 0 then
+        AutoLayer:ScanLayerFromNWB()
     end
-end)
+    return tonumber(addonTable.NWB.currentLayer)
+end
+
+ -- Autoexec?
+C_Timer.After(0.1, 
+    function()
+        AutoLayer:ScanLayerFromNWB()
+        if addonTable.NWB == nil then
+            AutoLayer:Print("Could not find NovaWorldBuffs, disabling NovaWorldBuffs integration")
+        end
+    end
+)
 
 ---@diagnostic disable-next-line:inject-field
 function AutoLayer:ProcessMessage(event, msg, name, _, channel)
-    if not self.db.profile.enabled then
+    if not self.db.profile.enabled or isPlayerLoggingOut() then
         return
     end
 
-    local name_without_realm = ({ strsplit("-", name) })[1]
+    local name_without_realm = removeRealmName(name)
     if name_without_realm == UnitName("player") then
         return
     end
 
-    local triggers = AutoLayer:ParseTriggers()
+    local triggerMatch = containsAnyWordFromList(msg, AutoLayer:ParseTriggers(), true)
+    if not triggerMatch then
+        return
+    end
 
-    for _, trigger in ipairs(triggers) do
-        if string.find(string.lower(msg), "%f[%a]"..string.lower(trigger).."%f[%A]") then
-            -- much efficency, much wow!
-            local blacklist = AutoLayer:ParseBlacklist()
-            for _, black in ipairs(blacklist) do
-                if string.match(string.lower(msg), string.lower(black)) then
-                    self:DebugPrint("Matched blacklist", black, "in message", msg)
-                    return
-                end
-            end
+    local blacklistMatch = containsAnyWordFromList(msg, AutoLayer:ParseBlacklist(), false)
+    if blacklistMatch then
+        self:DebugPrint("Matched blacklist: '", blacklistMatch, "' in message: '", msg, "' from player '", name_without_realm, "'")
+        return
+    end
 
-            self:DebugPrint("Matched trigger", trigger, "in message", msg)
-            if string.find(msg, "%d+") then
-                self:DebugPrint(name, "requested specific layer", msg)
-                if string.find(string.lower(msg), "not.-%d+") then
-                    self:DebugPrint(name, "contains 'not' in layer request, ignoring for now:", msg)
-                    return
-                end
-                if not containsNumber(msg, addonTable.NWB.currentLayer) then
-                    self:DebugPrint(name, "layer condition unsatisfied:", msg)
-                    self:DebugPrint("Current layer:", addonTable.NWB.currentLayer)
-                    return
-                end
-                self:DebugPrint(name, "layer condition satisfied", msg)
-            end
+    -- If we got this far, we have a valid match.
+    self:DebugPrint("Matched trigger: '", triggerMatch, "' in message: '", msg, "' from player '", name_without_realm, "'")
 
-            -- check if we've already invited this player in the last 5 minutes
-            if event ~= "CHAT_MSG_WHISPER" then
-                for i, player in ipairs(player_cache) do
-                    -- delete players from cache that are over 5 minutes old
-                    if player.time + 300 < time() then
-                        self:DebugPrint("Removing ", player.name, " from cache")
-                        table.remove(player_cache, i)
-                    end
-
-                    --self:DebugPrint("Checking ", player.name, " against ", name)
-                    --self:DebugPrint("Time: ", player.time, " + 300 < ", time(), " = ", player.time + 300 < time())
-
-                    local player_name_without_realm = ({ strsplit("-", player.name) })[1]
-
-                    -- dont invite player if they got invited in the last 5 minutes
-
-                    if player.name == name_without_realm or player_name_without_realm == name_without_realm and player.time + 300 > time() then
-                        self:DebugPrint("Already invited", name, "in the last 5 minutes")
-                        return
-                    end
-                end
-            end
-
-            --end
-
-            ---@diagnostic disable-next-line: undefined-global
-            InviteUnit(name)
-
-            -- check if group is full
-            if self.db.profile.autokick and GetNumGroupMembers() >= 4 then
-                self:DebugPrint("Group is full, kicking")
-
-                -- kick first member after group leader
-                for i = 4, GetNumGroupMembers() do
-                    if UnitIsGroupLeader("player") and i ~= 1 then
-                        kick_player = GetRaidRosterInfo(i)
-                    end
-                end
-
-                return
-            end
-
+    if string.find(msg, "%d+") then -- Uh oh, this player is picky and wants a specific layer!
+        local currentLayer = AutoLayer:getCurrentLayer()
+        if not currentLayer or currentLayer <= 0 then
+            self:DebugPrint("Message requested a specific layer, but we don't know what layer we're in! NWB says: ", addonTable.NWB, addonTable.NWB.currentLayer)
             return
         end
+        local requestedLayers = parseLayers(msg)
+        if not requestedLayers or next(requestedLayers) == nil then
+            self:DebugPrint("Message requested a specific layer, but we couldn't parse the message successfully!")
+            return
+        end
+
+        local requestIsInverted = containsAnyWordFromList(msg, AutoLayer:ParseInvertKeywords(), false)
+        local currLayerMatchesRequest = isNumberInList(currentLayer, requestedLayers)
+
+        if requestIsInverted then
+            self:DebugPrint("Message requested any layers except:", table.concat(requestedLayers, ", "))
+        else
+            self:DebugPrint("Message requested layers:", table.concat(requestedLayers, ", "))
+        end
+
+        if (requestIsInverted and currLayerMatchesRequest) or (not requestIsInverted and not currLayerMatchesRequest) then
+            self:DebugPrint("Request not satisfied. We are in layer ", currentLayer)
+            return
+        end
+    end
+    --If we got this far, then the message is a valid layer request that we can fulfill.
+
+    -- check if we've already invited this player in the last 5 minutes
+    if event ~= "CHAT_MSG_WHISPER" then -- If someone whispers us, that's fair game, they clearly want in
+        AutoLayer:pruneCache()
+        for i, cachedPlayer in ipairs(playersInvitedRecently) do
+            if cachedPlayer.name == name_without_realm and cachedPlayer.time + 300 > time() then
+                self:DebugPrint("Already invited", name, "in the last 5 minutes")
+                return
+            end
+        end
+    end
+
+
+    ---@diagnostic disable-next-line: undefined-global
+    InviteUnit(name) -- This specifically invites the player's name with realm, intended?
+
+    table.insert(recentLayerRequests, { name = name_without_realm, time = time()})
+    self:DebugPrint("Added", name_without_realm, "to list of recent layer requests")
+
+    -- check if group is full
+    if self.db.profile.autokick and GetNumGroupMembers() >= 4 then
+        self:DebugPrint("Group is full, kicking")
+
+        -- kick first member after group leader
+        for i = 4, GetNumGroupMembers() do
+            if UnitIsGroupLeader("player") and i ~= 1 then
+                kick_player = GetRaidRosterInfo(i)
+            end
+        end
+
+        return
     end
 end
 
@@ -123,19 +248,58 @@ function AutoLayer:ProcessSystemMessages(_, a)
 
     -- X joins the party
     if segments[2] == "joins" then
-        self.db.profile.layered = self.db.profile.layered + 1
+        local playerNameWithoutRealm = removeRealmName(segments[1])
 
-        table.insert(player_cache, { name = segments[1], time = time() - 100 })
+        -- Do AutoLayer stuff only if they actually asked for a layer
+        -- (this may be a normal player we're inviting for different reasons)
+        for i, entry in ipairs(recentLayerRequests) do
+            if entry.name == playerNameWithoutRealm then        
+                self.db.profile.layered = self.db.profile.layered + 1
+                table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() - 100 })
+                break -- Found the player, no need to continue checking
+            end
+        end      
     end
 
+    -- X declines your invite
     if segments[2] == "declines" then
-        table.insert(player_cache, { name = segments[1], time = time() })
-        self:DebugPrint("Adding ", segments[1], " to cache, reason: declined invite")
+        local playerNameWithoutRealm = removeRealmName(segments[1])
+        table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() }) --Extend this timer, they don't want in right now
+        self:DebugPrint("Adding ", playerNameWithoutRealm, " to cache, reason: declined invite")
     end
 
     if segments[3] == "invited" then
-        if addonTable.NWB ~= nil and addonTable.NWB.currentLayer ~= 0 and self.db.profile.whisper == true then
-            CTL:SendChatMessage("NORMAL", segments[4], "[AutoLayer] invited to layer " .. addonTable.NWB.currentLayer,
+        local playerNameWithoutRealm = removeRealmName(segments[4])
+
+        if playerNameWithoutRealm == "you" then return end -- X has invited you to group
+
+        if self.db.profile.inviteWhisper then
+            local currentLayer = AutoLayer:getCurrentLayer()
+
+            -- I guess don't whisper people if we don't know what layer we're in?
+            if currentLayer == nil or currentLayer <= 0 then
+                self:DebugPrint("Not whispering since we don't know what layer we're in! (", currentLayer, ")")
+                return
+            end
+
+            -- Don't whisper the player unless they specifically asked for a layer
+            -- (this may be a normal player we're inviting for different reasons)
+            local isPlayerInvited = false
+            for i, entry in ipairs(recentLayerRequests) do
+                if entry.name == playerNameWithoutRealm then
+                    isPlayerInvited = true
+                    break -- Found the player, no need to continue checking
+                end
+            end
+
+            if not isPlayerInvited then
+                return
+            end
+
+            -- Continue with the rest of the function if the player is in the list
+
+            local finalMessage = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplate, currentLayer)
+            CTL:SendChatMessage("NORMAL", segments[4], finalMessage,
                 "WHISPER", nil,
                 segments[4])
         end
