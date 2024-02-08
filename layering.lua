@@ -17,10 +17,17 @@ end
 
 function AutoLayer:pruneCache()
     for i, cachedPlayer in ipairs(playersInvitedRecently) do
-        -- delete players from cache that are over 5 minutes old
+        -- delete players that are over 5 minutes old
         if cachedPlayer.time + 300 < time() then
-            self:DebugPrint("Removing ", cachedPlayer.name, " from cache")
+            self:DebugPrint("Removing ", cachedPlayer.name, " from players invited recently")
             table.remove(playersInvitedRecently, i)
+        end
+    end
+    for i, cachedPlayer in ipairs(recentLayerRequests) do
+        -- delete players that are over 1 minute old
+        if cachedPlayer.time + 60 < time() then
+            self:DebugPrint("Removing ", cachedPlayer.name, " from recent layer requests")
+            table.remove(recentLayerRequests, i)
         end
     end
 end
@@ -213,17 +220,8 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
     ---@diagnostic disable-next-line: undefined-global
     InviteUnit(name) -- This specifically invites the player's name with realm, intended?
 
-    table.insert(recentLayerRequests, name_without_realm)
-    self:DebugPrint("Added", name_without_realm, "to list of recent layer requests, which is now: ", table.concat(recentLayerRequests, ", "))
-    C_Timer.After(60, function()
-        for i, listItem in ipairs(recentLayerRequests) do
-            if listItem == name_without_realm then
-                self:DebugPrint("Removed", name_without_realm, "from list of recent layer requests")
-                table.remove(recentLayerRequests, i)
-                break
-            end
-        end
-    end)
+    table.insert(recentLayerRequests, { name = name_without_realm, time = time()})
+    self:DebugPrint("Added", name_without_realm, "to list of recent layer requests")
 
     -- check if group is full
     if self.db.profile.autokick and GetNumGroupMembers() >= 4 then
@@ -254,8 +252,8 @@ function AutoLayer:ProcessSystemMessages(_, a)
 
         -- Do AutoLayer stuff only if they actually asked for a layer
         -- (this may be a normal player we're inviting for different reasons)
-        for i, cachedPlayerName in ipairs(recentLayerRequests) do
-            if cachedPlayerName == playerNameWithoutRealm then
+        for i, entry in ipairs(recentLayerRequests) do
+            if entry.name == playerNameWithoutRealm then        
                 self.db.profile.layered = self.db.profile.layered + 1
                 table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() - 100 })
                 break -- Found the player, no need to continue checking
@@ -287,8 +285,8 @@ function AutoLayer:ProcessSystemMessages(_, a)
             -- Don't whisper the player unless they specifically asked for a layer
             -- (this may be a normal player we're inviting for different reasons)
             local isPlayerInvited = false
-            for i, cachedPlayerName in ipairs(recentLayerRequests) do
-                if cachedPlayerName == playerNameWithoutRealm then
+            for i, entry in ipairs(recentLayerRequests) do
+                if entry.name == playerNameWithoutRealm then
                     isPlayerInvited = true
                     break -- Found the player, no need to continue checking
                 end
