@@ -145,7 +145,7 @@ local defaults = {
         minimap = {
             hide = false,
         },
-        autokick = true
+        autokick = false
     }
 }
 
