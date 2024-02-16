@@ -176,6 +176,11 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
 
     -- If we got this far, we have a valid match.
     self:DebugPrint("Matched trigger: '", triggerMatch, "' in message: '", msg, "' from player '", name_without_realm, "'")
+    
+    if self.db.profile.turnOffWhileRaidAssist and IsInRaid() and UnitIsGroupAssistant("player") then
+        self:DebugPrint("Ignoring request because we are raid assist!")
+        return
+    end
 
     local currentLayer = AutoLayer:getCurrentLayer()
     local isHighPriorityRequest = (event == "CHAT_MSG_WHISPER");
