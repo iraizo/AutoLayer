@@ -177,8 +177,10 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
     -- If we got this far, we have a valid match.
     self:DebugPrint("Matched trigger: '", triggerMatch, "' in message: '", msg, "' from player '", name_without_realm, "'")
 
-    if string.find(msg, "%d+") then -- Uh oh, this player is picky and wants a specific layer!
-        local currentLayer = AutoLayer:getCurrentLayer()
+    local currentLayer = AutoLayer:getCurrentLayer()
+    local isHighPriorityRequest = (event == "CHAT_MSG_WHISPER");
+
+    if string.find(msg, "%d+") then -- Uh oh, this player is picky and wants a specific layer!   
         if not currentLayer or currentLayer <= 0 then
             self:DebugPrint("Message requested a specific layer, but we don't know what layer we're in! NWB says: ", addonTable.NWB, addonTable.NWB.currentLayer)
             return
@@ -206,7 +208,7 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
     --If we got this far, then the message is a valid layer request that we can fulfill.
 
     -- check if we've already invited this player in the last 5 minutes
-    if event ~= "CHAT_MSG_WHISPER" then -- If someone whispers us, that's fair game, they clearly want in
+    if not isHighPriorityRequest then 
         AutoLayer:pruneCache()
         for i, cachedPlayer in ipairs(playersInvitedRecently) do
             if cachedPlayer.name == name_without_realm and cachedPlayer.time + 300 > time() then
@@ -216,9 +218,15 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
         end
     end
 
-
     ---@diagnostic disable-next-line: undefined-global
-    InviteUnit(name) -- This specifically invites the player's name with realm, intended?
+    if not isHighPriorityRequest and (not self.db.profile.inviteWhisper or not currentLayer or currentLayer <= 0) then
+        self:DebugPrint("Auto-whisper is turned off or we can't provide a helpful whisper, delaying our invite by 500 miliseconds")
+        C_Timer.After(0.5, function()
+            InviteUnit(name)
+        end)
+    else
+        InviteUnit(name) -- This specifically invites the player's name with realm, intended?
+    end
 
     table.insert(recentLayerRequests, { name = name_without_realm, time = time()})
     self:DebugPrint("Added", name_without_realm, "to list of recent layer requests")
