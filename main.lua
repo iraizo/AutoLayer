@@ -29,93 +29,11 @@ local options = {
             order = 1,
         },
 
-        triggers = {
-            type = 'input',
-            name = 'Triggers',
-            desc = 'If a message contains one of these words, it will cause AutoLayer to try to invite the player that sent it. Separated by comma, not comma and space. Matches whole words only.',
-            set = 'SetTriggers',
-            get = 'GetTriggers',
-        },
-
-        inviteWhisper = {
-            type = 'toggle',
-            name = 'Whisper when inviting',
-            desc = 'Sends a whisper to the player when inviting them, telling what layer you are inviting them to.',
-            set = function (info, val)
-                AutoLayer.db.profile.inviteWhisper = val
-            end,
-            get = function (info)
-                return AutoLayer.db.profile.inviteWhisper
-            end
-        },
-
-        inviteWhisperTemplate = {
-            type = 'input',
-            name = 'Invite whisper template',
-            desc = 'This the template of the whisper that will be sent on invite, if enabled. \'%s\' will be replaced by the layer\'s number.',
-            set = function (info, val)
-                AutoLayer.db.profile.inviteWhisperTemplate = val
-            end,
-            get = function (info)
-                return AutoLayer.db.profile.inviteWhisperTemplate
-            end
-        },
-
-        autokick = {
-            type = 'toggle',
-            name = 'Auto kick',
-            -- add red text to desc "test"
-            desc =
-            'Enable/Disable kicks the last member out if the group is full. \124cffFF0000You need to drag your mouse to trigger it due to an API restriction.\124r',
-            set = function(info, val)
-                AutoLayer.db.profile.autokick = val
-            end,
-            get = function(info)
-                return AutoLayer.db.profile.autokick
-            end,
-            order = 2,
-        },
-
-        blacklist = {
-            type = 'input',
-            name = 'Blacklist',
-            desc = 'If a message contains one of these words, AutoLayer will ignore the message no matter what. Separated by comma, not comma and space.',
-            set = 'SetBlacklist',
-            get = 'GetBlacklist',
-        },
-
-        invertKeywords = {
-            type = 'input',
-            name = 'Invert Keywords',
-            desc = 'If a message contains one of these words, AutoLayer will treat the message as someone looking for an invite for any layer *except* the ones they listed. Separated by comma, not comma and space.',
-            set = 'SetInvertKeywords',
-            get = 'GetInvertKeywords',
-        },
-
-        mutesounds = {
-            type = 'toggle',
-            name = 'Mute annoying sounds',
-            desc = 'Mutes party related sounds while autolayer is active',
-            set = function(info, val) 
-                AutoLayer.db.profile.mutesounds = val
-
-                if val then
-                	AutoLayer:MuteAnnoyingSounds()
-                else
-                    AutoLayer:Print("unmuting")
-                    AutoLayer:UnmuteAnnoyingSounds()
-                end
-            end,
-            get = function (info)
-            	  return AutoLayer.db.profile.mutesounds
-            end
-        },
-
         minimap = {
             type = 'toggle',
             name = 'Hide minimap icon',
             desc = 'Hide/Show the minimap icon',
-            order = 4,
+            order = 2,
             set = function(info, val)
                 AutoLayer.db.profile.minimap.hide = val
                 if val then
@@ -128,6 +46,108 @@ local options = {
                 return AutoLayer.db.profile.minimap.hide
             end,
         },
+
+        triggers = {
+            type = 'input',
+            name = 'Triggers',
+            desc = 'If a message contains one of these words, it will cause AutoLayer to try to invite the player that sent it. Separated by comma, not comma and space. Matches whole words only.',
+            set = 'SetTriggers',
+            get = 'GetTriggers',
+            order = 2,
+        },
+        
+        blacklist = {
+            type = 'input',
+            name = 'Blacklist',
+            desc = 'If a message contains one of these words, AutoLayer will ignore the message no matter what. Separated by comma, not comma and space.',
+            set = 'SetBlacklist',
+            get = 'GetBlacklist',
+            order = 3,
+        },
+
+        invertKeywords = {
+            type = 'input',
+            name = 'Invert Keywords',
+            desc = 'If a message contains one of these words, AutoLayer will treat the message as someone looking for an invite for any layer *except* the ones they listed. Separated by comma, not comma and space.',
+            set = 'SetInvertKeywords',
+            get = 'GetInvertKeywords',
+            order = 4,
+        },
+
+        inviteWhisper = {
+            type = 'toggle',
+            name = 'Whisper when inviting',
+            desc = 'Sends a whisper to the player when inviting them, telling what layer you are inviting them to.',
+            order = 5,
+            set = function (info, val)
+                AutoLayer.db.profile.inviteWhisper = val
+            end,
+            get = function (info)
+                return AutoLayer.db.profile.inviteWhisper
+            end
+        },
+
+        inviteWhisperTemplate = {
+            type = 'input',
+            name = 'Invite whisper template',
+            desc = 'This the template of the whisper that will be sent on invite, if enabled. \'%s\' will be replaced by the layer\'s number.',
+            order = 6,
+            set = function (info, val)
+                AutoLayer.db.profile.inviteWhisperTemplate = val
+            end,
+            get = function (info)
+                return AutoLayer.db.profile.inviteWhisperTemplate
+            end
+        },
+        
+        mutesounds = {
+            type = 'toggle',
+            name = 'Mute annoying sounds',
+            desc = 'Mutes party related sounds while autolayer is active',
+            order = 7,
+            set = function(info, val) 
+                AutoLayer.db.profile.mutesounds = val
+
+                if val then
+                    AutoLayer:MuteAnnoyingSounds()
+                else
+                    AutoLayer:Print("unmuting")
+                    AutoLayer:UnmuteAnnoyingSounds()
+                end
+            end,
+            get = function (info)
+                  return AutoLayer.db.profile.mutesounds
+            end
+        },
+
+        turnOffWhileRaidAssist = {
+            type = 'toggle',
+            name = 'Turn off while raid assist',
+            desc = 'Disable the functionality when you are raid assist.',
+            order = 8,
+            set = function(info, val)
+                AutoLayer.db.profile.turnOffWhileRaidAssist = val
+            end,
+            get = function(info)
+                return AutoLayer.db.profile.turnOffWhileRaidAssist
+            end,
+        },
+
+        autokick = {
+            type = 'toggle',
+            name = 'Auto kick when full',
+            order = 9,
+            -- add red text to desc "test"
+            desc =
+            'Enable/Disable kicks the last member out if the group is full. \124cffFF0000You need to drag your mouse to trigger it due to an API restriction.\124r',
+            set = function(info, val)
+                AutoLayer.db.profile.autokick = val
+            end,
+            get = function(info)
+                return AutoLayer.db.profile.autokick
+            end,
+        },
+
     }
 }
 
@@ -136,16 +156,17 @@ local defaults = {
         enabled = true,
         debug = false,
         triggers = "layer",
-        sendMessage = false,
         blacklist = "wts,wtb,lfm,lfg,ashen,auto inv,autoinv,pst for,guild,raid,enchant,player,what layer,which layer",
         invertKeywords = "not,off,except,but,out,other than,besides,apart from",
+        inviteWhisper = true,
         inviteWhisperTemplate = "Inviting you to layer %s...",
         mutesounds = true,
         layered = 0,
         minimap = {
             hide = false,
         },
-        autokick = true
+        autokick = false,
+        turnOffWhileRaidAssist = true,
     }
 }
 

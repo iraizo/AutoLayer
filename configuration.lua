@@ -19,15 +19,6 @@ function AutoLayer:GetEnabled(info)
     return self.db.profile.enabled
 end
 
-function AutoLayer:SetSendMessage(info, val)
-    AutoLayer:DebugPrint("SetSendMessage", info, val)
-    self.db.profile.sendMessage = val
-end
-
-function AutoLayer:GetSendMessage(info)
-    return self.db.profile.sendMessage
-end
-
 function AutoLayer:SetTriggers(info, val)
     AutoLayer:DebugPrint("SetTriggers", info, val)
     self.db.profile.triggers = val
