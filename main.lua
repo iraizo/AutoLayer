@@ -183,6 +183,10 @@ function AutoLayer:OnInitialize()
         icon = "Interface\\Icons\\INV_Bijou_Red"
     end
 
+    if self.db.profile.mutesounds then
+        self:MuteAnnoyingSounds()
+    end
+
     ---@diagnostic disable-next-line: missing-fields
     local bunnyLDB = LibStub("LibDataBroker-1.1"):NewDataObject("AutoLayer", {
         type = "data source",
