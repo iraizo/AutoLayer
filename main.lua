@@ -11,144 +11,155 @@ local options = {
     handler = AutoLayer,
     type = "group",
     args = {
-        enabled = {
-            type = 'toggle',
-            name = 'Enabled',
-            desc = 'Enable/Disable AutoLayer',
-            set = 'SetEnabled',
-            get = 'GetEnabled',
+        generalSettings = {
+            type = "group",
+            name = "General Settings",
+            inline = true,
             order = 0,
+            args = {
+                enabled = {
+                    type = 'toggle',
+                    name = 'Enabled',
+                    desc = 'Enable or disable AutoLayer.',
+                    set = 'SetEnabled',
+                    get = 'GetEnabled',
+                    order = 1,
+                },
+                debug = {
+                    type = 'toggle',
+                    name = 'Debug Mode',
+                    desc = 'Enable or disable debug messages.',
+                    set = 'SetDebug',
+                    get = 'GetDebug',
+                    order = 2,
+                },
+                minimap = {
+                    type = 'toggle',
+                    name = 'Minimap Icon',
+                    desc = 'Show or hide the minimap icon.',
+                    set = function(info, val)
+                        AutoLayer.db.profile.minimap.hide = val
+                        if val then
+                            minimap_icon:Hide("AutoLayer")
+                        else
+                            minimap_icon:Show("AutoLayer")
+                        end
+                    end,
+                    get = function(info)
+                        return AutoLayer.db.profile.minimap.hide
+                    end,
+                    order = 3,
+                },
+            },
         },
 
-        debug = {
-            type = 'toggle',
-            name = 'Debug',
-            desc = 'Enable/Disable debug messages',
-            set = 'SetDebug',
-            get = 'GetDebug',
+        messagingSettings = {
+            type = "group",
+            name = "Messaging Settings",
+            inline = true,
             order = 1,
+            args = {
+                triggers = {
+                    type = 'input',
+                    name = 'Invite Triggers',
+                    desc = 'Comma-separated words to trigger inviting a player.',
+                    set = 'SetTriggers',
+                    get = 'GetTriggers',
+                    order = 1,
+                },
+                blacklist = {
+                    type = 'input',
+                    name = 'Blacklist',
+                    desc = 'Comma-separated words to ignore messages containing them.',
+                    set = 'SetBlacklist',
+                    get = 'GetBlacklist',
+                    order = 2,
+                },
+                invertKeywords = {
+                    type = 'input',
+                    name = 'Invert Keywords',
+                    desc = 'Comma-separated words to exclude specific layers.',
+                    set = 'SetInvertKeywords',
+                    get = 'GetInvertKeywords',
+                    order = 3,
+                },
+                inviteWhisper = {
+                    type = 'toggle',
+                    name = 'Whisper Invites',
+                    desc = 'Send a whisper to players when inviting them.',
+                    set = function(info, val)
+                        AutoLayer.db.profile.inviteWhisper = val
+                    end,
+                    get = function(info)
+                        return AutoLayer.db.profile.inviteWhisper
+                    end,
+                    order = 4,
+                },
+                inviteWhisperTemplate = {
+                    type = 'input',
+                    name = 'Whisper Template',
+                    desc = 'Template for invite whispers. Use %s for layer number.',
+                    set = function(info, val)
+                        AutoLayer.db.profile.inviteWhisperTemplate = val
+                    end,
+                    get = function(info)
+                        return AutoLayer.db.profile.inviteWhisperTemplate
+                    end,
+                    order = 5,
+                },
+            },
         },
 
-        minimap = {
-            type = 'toggle',
-            name = 'Hide minimap icon',
-            desc = 'Hide/Show the minimap icon',
+        soundAndBehavior = {
+            type = "group",
+            name = "Sound and Behavior",
+            inline = true,
             order = 2,
-            set = function(info, val)
-                AutoLayer.db.profile.minimap.hide = val
-                if val then
-                    minimap_icon:Hide("AutoLayer")
-                else
-                    minimap_icon:Show("AutoLayer")
-                end
-            end,
-            get = function(info)
-                return AutoLayer.db.profile.minimap.hide
-            end,
+            args = {
+                mutesounds = {
+                    type = 'toggle',
+                    name = 'Mute Sounds',
+                    desc = 'Mute party-related sounds while AutoLayer is active.',
+                    set = function(info, val)
+                        AutoLayer.db.profile.mutesounds = val
+                        if val then
+                            AutoLayer:MuteAnnoyingSounds()
+                        else
+                            AutoLayer:UnmuteAnnoyingSounds()
+                        end
+                    end,
+                    get = function(info)
+                        return AutoLayer.db.profile.mutesounds
+                    end,
+                    order = 1,
+                },
+                turnOffWhileRaidAssist = {
+                    type = 'toggle',
+                    name = 'Disable in Raid Assist',
+                    desc = 'Turn off AutoLayer functionality when you are raid assist.',
+                    set = function(info, val)
+                        AutoLayer.db.profile.turnOffWhileRaidAssist = val
+                    end,
+                    get = function(info)
+                        return AutoLayer.db.profile.turnOffWhileRaidAssist
+                    end,
+                    order = 2,
+                },
+                autokick = {
+                    type = 'toggle',
+                    name = 'Auto-Kick on Full',
+                    desc = '|cffFF0000Requires manual interaction.|r Kicks the last member if the group is full.',
+                    set = function(info, val)
+                        AutoLayer.db.profile.autokick = val
+                    end,
+                    get = function(info)
+                        return AutoLayer.db.profile.autokick
+                    end,
+                    order = 3,
+                },
+            },
         },
-
-        triggers = {
-            type = 'input',
-            name = 'Triggers',
-            desc = 'If a message contains one of these words, it will cause AutoLayer to try to invite the player that sent it. Separated by comma, not comma and space. Matches whole words only.',
-            set = 'SetTriggers',
-            get = 'GetTriggers',
-            order = 2,
-        },
-        
-        blacklist = {
-            type = 'input',
-            name = 'Blacklist',
-            desc = 'If a message contains one of these words, AutoLayer will ignore the message no matter what. Separated by comma, not comma and space.',
-            set = 'SetBlacklist',
-            get = 'GetBlacklist',
-            order = 3,
-        },
-
-        invertKeywords = {
-            type = 'input',
-            name = 'Invert Keywords',
-            desc = 'If a message contains one of these words, AutoLayer will treat the message as someone looking for an invite for any layer *except* the ones they listed. Separated by comma, not comma and space.',
-            set = 'SetInvertKeywords',
-            get = 'GetInvertKeywords',
-            order = 4,
-        },
-
-        inviteWhisper = {
-            type = 'toggle',
-            name = 'Whisper when inviting',
-            desc = 'Sends a whisper to the player when inviting them, telling what layer you are inviting them to.',
-            order = 5,
-            set = function (info, val)
-                AutoLayer.db.profile.inviteWhisper = val
-            end,
-            get = function (info)
-                return AutoLayer.db.profile.inviteWhisper
-            end
-        },
-
-        inviteWhisperTemplate = {
-            type = 'input',
-            name = 'Invite whisper template',
-            desc = 'This the template of the whisper that will be sent on invite, if enabled. \'%s\' will be replaced by the layer\'s number.',
-            order = 6,
-            set = function (info, val)
-                AutoLayer.db.profile.inviteWhisperTemplate = val
-            end,
-            get = function (info)
-                return AutoLayer.db.profile.inviteWhisperTemplate
-            end
-        },
-        
-        mutesounds = {
-            type = 'toggle',
-            name = 'Mute annoying sounds',
-            desc = 'Mutes party related sounds while autolayer is active',
-            order = 7,
-            set = function(info, val) 
-                AutoLayer.db.profile.mutesounds = val
-
-                if val then
-                    AutoLayer:MuteAnnoyingSounds()
-                else
-                    AutoLayer:Print("unmuting")
-                    AutoLayer:UnmuteAnnoyingSounds()
-                end
-            end,
-            get = function (info)
-                  return AutoLayer.db.profile.mutesounds
-            end
-        },
-
-        turnOffWhileRaidAssist = {
-            type = 'toggle',
-            name = 'Turn off while raid assist',
-            desc = 'Disable the functionality when you are raid assist.',
-            order = 8,
-            set = function(info, val)
-                AutoLayer.db.profile.turnOffWhileRaidAssist = val
-            end,
-            get = function(info)
-                return AutoLayer.db.profile.turnOffWhileRaidAssist
-            end,
-        },
-
-        autokick = {
-            type = 'toggle',
-            name = 'Auto kick when full',
-            order = 9,
-            -- add red text to desc "test"
-            desc =
-            'Enable/Disable kicks the last member out if the group is full. \124cffFF0000You need to drag your mouse to trigger it due to an API restriction.\124r',
-            set = function(info, val)
-                AutoLayer.db.profile.autokick = val
-            end,
-            get = function(info)
-                return AutoLayer.db.profile.autokick
-            end,
-        },
-
-    }
+    },
 }
 
 local defaults = {
