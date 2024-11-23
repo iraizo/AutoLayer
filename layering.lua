@@ -364,8 +364,15 @@ function ProccessQueue()
     end
 end
 
+local l_channel_num = GetChannelName("layer")
+
 C_Timer.After(1, function()
     WorldFrame:HookScript("OnMouseDown", function(self, button)
+        if l_channel_num == 0 then
+            JoinLayerChannel()
+            do return end
+        end
+
         AutoLayer:HandleAutoKick()
         ProccessQueue()
     end)

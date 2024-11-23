@@ -84,11 +84,6 @@ function AutoLayer:HopGUI()
     table.insert(selected_layers, v)
   end)
 
-  local desc = AceGUI:Create("Label")
-  desc:SetText(
-    "This feature is still in beta, feedback is appreciated.\n This will send a message into the lookingforgroup channel where autolayer users will respond accordingly.\n|cFF00FF00This should now be fixed!|r");
-
   frame:AddChild(layer)
   frame:AddChild(send)
-  frame:AddChild(desc)
 end
