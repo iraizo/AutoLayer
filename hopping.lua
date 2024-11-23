@@ -24,66 +24,84 @@ function AutoLayer:HopGUI()
   is_closed = false
   local frame = AceGUI:Create("Frame")
   frame:SetTitle("AutoLayer - Hopper")
-  -- make frame as small as possible
-  frame:SetWidth(300)
-  AutoLayer:DebugPrint(res)
-  frame:SetHeight(200)
+  frame:SetWidth(350)
+  frame:SetHeight(250)
   frame:SetStatusText("Beta feature")
+  frame:SetLayout("Flow")
 
-  if addonTable.NWB == nil then
-    -- add text to frame
-    local desc = AceGUI:Create("Label")
-    desc:SetText("You need to have the NovaWorldBuffs addon installed to use this feature.")
-    frame:AddChild(desc)
-    return
-  end
-
+  -- Set a background color and padding
   frame:SetCallback("OnClose", function()
     is_closed = true
     selected_layers = {}
   end)
 
-  -- multi combo box
-  local layer = AceGUI:Create("Dropdown")
-  layer:SetLabel("Select Layer")
-  layer:SetMultiselect(true)
+  -- Check if NovaWorldBuffs is installed
+  if addonTable.NWB == nil then
+    local desc = AceGUI:Create("Label")
+    desc:SetText("You need to have the NovaWorldBuffs addon installed to use this feature.")
+    desc:SetFullWidth(true)
+    frame:AddChild(desc)
+    return
+  end
 
-  local count = 0;
+  -- Create a header for clarity
+  local header = AceGUI:Create("Label")
+  header:SetText("Select Layers to Hop to:")
+  header:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
+  header:SetFullWidth(true)
+  header:SetJustifyH("CENTER")
+  frame:AddChild(header)
+
+  -- Multi-combo box for selecting layers
+  local layer = AceGUI:Create("Dropdown")
+  layer:SetLabel("Available Layers")
+  layer:SetMultiselect(true)
+  layer:SetWidth(300)
+  
+  local count = 0
   local layers = {}
   for _ in pairs(addonTable.NWB.data.layers) do
     count = count + 1
     table.insert(layers, tostring(count))
   end
 
+  -- Set previously selected values
   for _, selected_layer in ipairs(selected_layers) do
     layer:SetValue(selected_layer)
   end
 
-  -- add send button under it
+  -- Create send button
   local send = AceGUI:Create("Button")
-  send:SetText("Send")
-  send:SetWidth(100)
+  send:SetText("Send Layer Request")
+  send:SetWidth(160)
   send:SetCallback("OnClick", function()
     AutoLayer:SendLayerRequest()
   end)
-
   send:SetDisabled(true)
 
   layer:SetList(layers)
   layer:SetCallback("OnValueChanged", function(_, _, v)
+    local found = false
     for i, selected_layer in ipairs(selected_layers) do
       if selected_layer == v then
         table.remove(selected_layers, i)
-        if #selected_layers == 0 then
-          send:SetDisabled(true)
-        end
-        return
+        found = true
+        break
       end
     end
-    send:SetDisabled(false)
-    table.insert(selected_layers, v)
+    if not found then
+      table.insert(selected_layers, v)
+    end
+
+    -- Enable or disable the Send button
+    if #selected_layers > 0 then
+      send:SetDisabled(false)
+    else
+      send:SetDisabled(true)
+    end
   end)
 
+  -- Add components to frame
   frame:AddChild(layer)
   frame:AddChild(send)
 end
