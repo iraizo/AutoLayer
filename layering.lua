@@ -342,7 +342,7 @@ function JoinLayerChannel()
     if channel_num == 0 then
         print("Failed to join Layer channel")
     else
-        print("Successfully joined Layer channel.")
+        -- print("Successfully joined Layer channel.")
     end
 
     for i = 1, 10 do
@@ -364,10 +364,9 @@ function ProccessQueue()
     end
 end
 
-local l_channel_num = GetChannelName("layer")
-
 C_Timer.After(1, function()
     WorldFrame:HookScript("OnMouseDown", function(self, button)
+        local l_channel_num = GetChannelName("layer")
         if l_channel_num == 0 then
             JoinLayerChannel()
             do return end
