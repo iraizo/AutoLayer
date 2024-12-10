@@ -35,7 +35,7 @@ local options = {
                 },
                 minimap = {
                     type = 'toggle',
-                    name = 'Minimap Icon',
+                    name = 'Hide Minimap Icon',
                     desc = 'Show or hide the minimap icon.',
                     set = function(info, val)
                         AutoLayer.db.profile.minimap.hide = val
