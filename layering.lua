@@ -223,14 +223,29 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
         end
     end
 
+    -- used to check if we should invite with or without realm name below
+    -- due to the fact that era has mega servers (multiple realms in one server)
+    -- where we have to invite with the realm name
+    -- since those do not exist on anniversary servers and where HasActiveSeason() is true
+    -- we can validate it like this for now.
+    local isSeasonal = C_Seasons.HasActiveSeason()
+
     ---@diagnostic disable-next-line: undefined-global
     if not isHighPriorityRequest and (not self.db.profile.inviteWhisper or not currentLayer or currentLayer <= 0) then
         self:DebugPrint("Auto-whisper is turned off or we can't provide a helpful whisper, delaying our invite by 500 miliseconds")
         C_Timer.After(0.5, function()
-            InviteUnit(name)
+            if isSeasonal then
+                InviteUnit(name_without_realm)
+            else
+                InviteUnit(name)
+            end
         end)
     else
-        InviteUnit(name) -- This specifically invites the player's name with realm, intended?
+        if isSeasonal then
+            InviteUnit(name_without_realm)
+        else
+            InviteUnit(name)
+        end
     end
 
     table.insert(recentLayerRequests, { name = name_without_realm, time = time()})
