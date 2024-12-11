@@ -326,11 +326,15 @@ function AutoLayer:ProcessSystemMessages(_, a)
 
             -- Continue with the rest of the function if the player is in the list
 
-            local finalMessage = "[AutoLayer Addon] " .. string.format(self.db.profile.inviteWhisperTemplate, currentLayer)
-            CTL:SendChatMessage("NORMAL", segments[4], finalMessage,
-                "WHISPER", nil,
-                segments[4])
-        end
+            local finalMessage = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplate, currentLayer)
+			CTL:SendChatMessage("NORMAL", segments[4], finalMessage, "WHISPER", nil, segments[4])
+		end
+		
+		if self.db.profile.inviteWhisperReminder then
+		
+			local finalMessage2 = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplateReminder)
+			CTL:SendChatMessage("NORMAL", segments[4], finalMessage2, "WHISPER", nil, segments[4])
+		end
     end
 end
 

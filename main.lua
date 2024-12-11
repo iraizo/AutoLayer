@@ -97,6 +97,7 @@ local options = {
                 },
                 inviteWhisperTemplate = {
                     type = 'input',
+					width = 'double',
                     name = 'Whisper Template',
                     desc = 'Template for invite whispers. Use %s for layer number.',
                     set = function(info, val)
@@ -106,6 +107,31 @@ local options = {
                         return AutoLayer.db.profile.inviteWhisperTemplate
                     end,
                     order = 5,
+				},
+                inviteWhisperReminder = {
+                    type = 'toggle',
+                    name = 'Whisper Reminder Text',
+                    desc = 'Send a reminder text to Leave Party after layer switch.',
+                    set = function(info, val)
+                        AutoLayer.db.profile.inviteWhisperReminder = val
+                    end,
+                    get = function(info)
+                        return AutoLayer.db.profile.inviteWhisperReminder
+                    end,
+                    order = 6,
+                },				
+				inviteWhisperTemplateReminder = {
+                    type = 'input',
+					width = 'double',
+                    name = 'Whisper Template Second Line',
+                    desc = 'Reminder to Leave Party after layer switch.',
+                    set = function(info, val)
+                        AutoLayer.db.profile.inviteWhisperTemplateReminder = val
+                    end,
+                    get = function(info)
+                        return AutoLayer.db.profile.inviteWhisperTemplateReminder
+                    end,
+                    order = 7,
                 },
             },
         },
@@ -171,6 +197,8 @@ local defaults = {
         invertKeywords = "not,off,except,but,out,other than,besides,apart from",
         inviteWhisper = true,
         inviteWhisperTemplate = "Inviting you to layer %s...",
+		inviteWhisperReminder = true,
+		inviteWhisperTemplateReminder = "Please Leave Party after layer switch",
         mutesounds = true,
         layered = 0,
         minimap = {
