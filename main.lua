@@ -50,6 +50,18 @@ local options = {
                     end,
                     order = 3,
                 },
+                guildOnly = {
+                    type = 'toggle',
+                    name = 'Guild Only',
+                    desc = 'Only invite players from your guild.',
+                    set = function(info, val)
+                        AutoLayer.db.profile.guildOnly = val
+                    end,
+                    get = function(info)
+                        return AutoLayer.db.profile.guildOnly
+                    end,
+                    order = 4,
+                },
             },
         },
 
@@ -200,6 +212,7 @@ local defaults = {
 		inviteWhisperReminder = true,
 		inviteWhisperTemplateReminder = "Please Leave Party after layer switch",
         mutesounds = true,
+        guildOnly = false,
         layered = 0,
         minimap = {
             hide = false,

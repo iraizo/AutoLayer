@@ -80,7 +80,12 @@
         "Minimap",
         "WOW_PROJECT_ID",
         "WOW_PROJECT_MAINLINE",
-        "rawequal"
+        "rawequal",
+        "C_Seasons",
+        "UnitIsGroupAssistant",
+        "IsInRaid",
+        "InviteUnit",
+        "STATICPOPUP_NUMDIALOGS"
     ],
     "Lua.diagnostics.disable": [
         "undefined-field",

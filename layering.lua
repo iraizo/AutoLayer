@@ -142,8 +142,8 @@ function AutoLayer:getCurrentLayer()
     return tonumber(addonTable.NWB.currentLayer)
 end
 
- -- Autoexec?
-C_Timer.After(0.1, 
+-- Autoexec?
+C_Timer.After(0.1,
     function()
         AutoLayer:ScanLayerFromNWB()
         if addonTable.NWB == nil then
@@ -153,8 +153,12 @@ C_Timer.After(0.1,
 )
 
 ---@diagnostic disable-next-line:inject-field
-function AutoLayer:ProcessMessage(event, msg, name, _, channel)
+function AutoLayer:ProcessMessage(event, msg, name)
     if not self.db.profile.enabled or isPlayerLoggingOut() then
+        return
+    end
+
+    if event ~= "CHAT_MSG_GUILD" and self.db.profile.guildOnly then
         return
     end
 
@@ -176,7 +180,7 @@ function AutoLayer:ProcessMessage(event, msg, name, _, channel)
 
     -- If we got this far, we have a valid match.
     self:DebugPrint("Matched trigger: '", triggerMatch, "' in message: '", msg, "' from player '", name_without_realm, "'")
-    
+
     if self.db.profile.turnOffWhileRaidAssist and IsInRaid() and UnitIsGroupAssistant("player") then
         self:DebugPrint("Ignoring request because we are raid assist!")
         return
@@ -286,7 +290,7 @@ function AutoLayer:ProcessSystemMessages(_, a)
                 table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() - 100 })
                 break -- Found the player, no need to continue checking
             end
-        end      
+        end
     end
 
     -- X declines your invite
