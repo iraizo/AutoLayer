@@ -209,6 +209,13 @@ local defaults = {
     }
 }
 
+local annoyingSounds = {
+	567490, -- invite sent
+	567451, -- invite accepted
+	539839, 540356, 540778, 540941, 540984, 542585, 542862, 540287, 540579, 541222, 542952, 542659, 539901, 541298, 543146, 543174 -- "they can't join our group"
+}
+
+
 ---@diagnostic disable-next-line: duplicate-set-field
 function AutoLayer:OnInitialize()
     LibStub("AceConfig-3.0"):RegisterOptionsTable("AutoLayer", options)
@@ -271,15 +278,16 @@ function AutoLayer:OnInitialize()
     minimap_icon:Register("AutoLayer", bunnyLDB, self.db.profile.minimap)
 end
 
-
 function AutoLayer:MuteAnnoyingSounds()
-    MuteSoundFile(567451)
-    MuteSoundFile(567490)
+	for _, soundFileId in pairs(annoyingSounds) do
+		MuteSoundFile(soundFileId)
+	end
 end
 
 function AutoLayer:UnmuteAnnoyingSounds()
-    UnmuteSoundFile(567451)
-    UnmuteSoundFile(567490)
+	for _, soundFileId in pairs(annoyingSounds) do
+		UnmuteSoundFile(soundFileId)
+	end
 end
 
 function AutoLayer:DebugPrint(...)
