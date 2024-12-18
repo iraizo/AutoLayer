@@ -52,12 +52,30 @@ function AutoLayer:HopGUI()
   header:SetJustifyH("CENTER")
   frame:AddChild(header)
 
+  local currentLayerGroup = AceGUI:Create("InlineGroup")
+  currentLayerGroup:SetFullWidth(true)
+  currentLayerGroup:SetLayout("Flow")
+
+  local currentLayerDescriptionLabel = AceGUI:Create("Label")
+  currentLayerDescriptionLabel:SetText("Current Layer:")
+  currentLayerDescriptionLabel:SetFont("Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
+  currentLayerDescriptionLabel:SetWidth(120)
+  currentLayerGroup:AddChild(currentLayerDescriptionLabel)
+
+  local currentLayerLabel = AceGUI:Create("Label")
+  currentLayerLabel:SetFontObject(GameFontHighlightSmall)
+  currentLayerLabel:SetWidth(170)
+  currentLayerGroup:AddChild(currentLayerLabel)
+
+  frame:AddChild(currentLayerGroup)
+
   -- Multi-combo box for selecting layers
   local layer = AceGUI:Create("Dropdown")
   layer:SetLabel("Available Layers")
+  layer:SetFullWidth(true)
   layer:SetMultiselect(true)
   layer:SetWidth(300)
-  
+
   local count = 0
   local layers = {}
   for _ in pairs(addonTable.NWB.data.layers) do
@@ -80,16 +98,19 @@ function AutoLayer:HopGUI()
   send:SetDisabled(true)
 
   layer:SetList(layers)
-  layer:SetCallback("OnValueChanged", function(_, _, v)
+
+  local function OnValueChanged(_, _, v, checked)
     local found = false
     for i, selected_layer in ipairs(selected_layers) do
       if selected_layer == v then
-        table.remove(selected_layers, i)
+        if not checked then
+          table.remove(selected_layers, i)
+        end
         found = true
         break
       end
     end
-    if not found then
+    if checked and not found then
       table.insert(selected_layers, v)
     end
 
@@ -99,7 +120,55 @@ function AutoLayer:HopGUI()
     else
       send:SetDisabled(true)
     end
-  end)
+  end
+
+  layer:SetCallback("OnValueChanged", OnValueChanged)
+
+  local currentLayer = NWB_CurrentLayer
+
+  if currentLayer and currentLayer > 0 then
+    -- autoselect all layers except the layer we're currently on
+    for i in ipairs(layers) do
+      if i ~= currentLayer then
+        layer:SetItemValue(i, true)
+        OnValueChanged(nil, nil, i, true) -- for god known reasons SetItemValue does not trigger OnValueChanged event so we have to do that manually :/
+      end
+    end
+  end
+
+  local lastKnownLayer = nil
+  local function UpdateLayerText() -- while UI open, constantly monitors changes to 'NWB_CurrentLayer' and updates UI
+    if is_closed then
+      return
+    end
+
+    local currentLayer = NWB_CurrentLayer
+
+    if currentLayer and lastKnownLayer ~= currentLayer then
+      if currentLayer > 0 then
+        for i, widget in layer.pullout:IterateItems() do
+          if widget.userdata.value == lastKnownLayer then
+            widget:SetText(lastKnownLayer)
+            layer:SetMultiselect(layer:GetMultiselect()) -- the most decent way to trigger dropdown text update
+          elseif widget.userdata.value == currentLayer then
+            widget:SetText(currentLayer .. " (current)")
+            layer:SetMultiselect(layer:GetMultiselect()) -- the most decent way to trigger dropdown text update
+          end
+        end
+
+        currentLayerLabel:SetText(currentLayer)
+        currentLayerLabel:SetColor(0, 1, 0)
+      else
+        currentLayerLabel:SetText("Unknown (try to target an NPC)")
+        currentLayerLabel:SetColor(1, 0, 0)
+      end
+
+      lastKnownLayer = currentLayer
+    end
+
+    C_Timer.After(0.5, UpdateLayerText)
+  end
+  UpdateLayerText()
 
   -- Add components to frame
   frame:AddChild(layer)
