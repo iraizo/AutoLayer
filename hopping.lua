@@ -80,7 +80,7 @@ function AutoLayer:HopGUI()
 
     -- Multi-combo box for selecting layers
     local layer = AceGUI:Create("Dropdown")
-    layer:SetLabel("Available Layers")
+    layer:SetLabel("Request Layers:")
     layer:SetFullWidth(true)
     layer:SetMultiselect(true)
     layer:SetWidth(300)
