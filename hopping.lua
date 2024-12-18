@@ -54,7 +54,7 @@ function AutoLayer:HopGUI()
   -- Check if NovaWorldBuffs is installed
   if addonTable.NWB == nil then
     local desc = AceGUI:Create("Label")
-    desc:SetText("This feature works much better with NovaWorldBuffs addon.")
+    desc:SetText("Please consider installing NovaWorldBuffs addon, it allows you to discover current layer and select layers to hop to.")
     desc:SetColor(1,0,0)
     desc:SetFullWidth(true)
     frame:AddChild(desc)
