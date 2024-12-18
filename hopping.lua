@@ -35,14 +35,6 @@ function AutoLayer:HopGUI()
     selected_layers = {}
   end)
 
-  -- Create a header for clarity
-  local header = AceGUI:Create("Label")
-  header:SetText("Select Layers to Hop to:")
-  header:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
-  header:SetFullWidth(true)
-  header:SetJustifyH("CENTER")
-  frame:AddChild(header)
-
     -- Create send button
     local send = AceGUI:Create("Button")
     send:SetText("Send Layer Request")
@@ -59,6 +51,14 @@ function AutoLayer:HopGUI()
     desc:SetFullWidth(true)
     frame:AddChild(desc)
   else
+    -- Create a header for clarity
+    local header = AceGUI:Create("Label")
+    header:SetText("Select Layers to Hop to:")
+    header:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
+    header:SetFullWidth(true)
+    header:SetJustifyH("CENTER")
+    frame:AddChild(header)
+
     send:SetDisabled(true)
       
     local currentLayerGroup = AceGUI:Create("InlineGroup")
