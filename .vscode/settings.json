@@ -85,7 +85,8 @@
         "UnitIsGroupAssistant",
         "IsInRaid",
         "InviteUnit",
-        "STATICPOPUP_NUMDIALOGS"
+        "STATICPOPUP_NUMDIALOGS",
+        "NWB_CurrentLayer"
     ],
     "Lua.diagnostics.disable": [
         "undefined-field",
