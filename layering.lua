@@ -191,7 +191,7 @@ function AutoLayer:ProcessMessage(event, msg, name)
 
     if string.find(msg, "%d+") then -- Uh oh, this player is picky and wants a specific layer!   
         if not currentLayer or currentLayer <= 0 then
-            self:DebugPrint("Message requested a specific layer, but we don't know what layer we're in! NWB says: ", addonTable.NWB, addonTable.NWB.currentLayer)
+            self:DebugPrint("Message requested a specific layer, but we don't know what layer we're in! NWB says: ", addonTable.NWB.currentLayer)
             return
         end
         local requestedLayers = parseLayers(msg)
@@ -279,13 +279,13 @@ function AutoLayer:ProcessSystemMessages(_, a)
     local segments = { strsplit(" ", a) }
 
     -- X joins the party
-    if segments[2] == "joins" then
+    if segments[3] == "joined" then
         local playerNameWithoutRealm = removeRealmName(segments[1])
 
         -- Do AutoLayer stuff only if they actually asked for a layer
         -- (this may be a normal player we're inviting for different reasons)
         for i, entry in ipairs(recentLayerRequests) do
-            if entry.name == playerNameWithoutRealm then        
+            if entry.name == playerNameWithoutRealm then
                 self.db.profile.layered = self.db.profile.layered + 1
                 table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() - 100 })
                 break -- Found the player, no need to continue checking

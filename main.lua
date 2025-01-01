@@ -271,7 +271,7 @@ function AutoLayer:OnInitialize()
             tooltip:AddLine("AutoLayer")
             tooltip:AddLine("Left-click to toggle AutoLayer")
             tooltip:AddLine("Right-click to hop layers")
-            tooltip:AddLine("Layered " .. self.db.profile.layered .. " players")
+            tooltip:AddLine("Layered " .. self.db.profile.layered .. " times")
             
             if addonTable.NWB ~= nil then
                 local currentLayer = AutoLayer:getCurrentLayer()
