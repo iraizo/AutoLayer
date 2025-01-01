@@ -1,8 +1,8 @@
-## Interface: 11404
+## Interface: 11505
 ## Title: AutoLayer
 ## Notes: Automatically invites people that want to layer switch
 ## Author: raizo
-## Version: 0.1
+## Version: 1.4.2
 ## SavedVariables: AutoLayerDB
 
 embeds.xml
