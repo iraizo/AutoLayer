@@ -270,13 +270,9 @@ function AutoLayer:ProcessMessage(event, msg, name)
     if self.db.profile.autokick and GetNumGroupMembers() >= 4 then
         self:DebugPrint("Group is full, kicking")
 
-        -- kick first member after group leader
-        for i = 4, GetNumGroupMembers() do
-            if UnitIsGroupLeader("player") and i ~= 1 then
-                local player_tbk = GetRaidRosterInfo(i)
-                table.insert(kicked_player_queue, player_tbk)
-            end
-        end
+        -- kick last member of raid
+        local lastMember = GetRaidRosterInfo(GetNumGroupMembers())
+        table.insert(kicked_player_queue, lastMember)
 
         return
     end
