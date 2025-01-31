@@ -361,7 +361,7 @@ function AutoLayer:HandleAutoKick()
             return
         end
 
-        if ~UnitInRaid(name) and ~UnitInParty(name) then
+        if not UnitInRaid(name) and not UnitInParty(name) then
             return
         end
 
