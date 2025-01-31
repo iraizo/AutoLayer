@@ -287,7 +287,7 @@ function AutoLayer:ProcessSystemMessages(_, a)
     local segments = { strsplit(" ", a) }
 
     -- X joins the party
-    if segments[3] == "joins" then
+    if segments[2] == "joins" then
         local playerNameWithoutRealm = removeRealmName(segments[1])
 
         -- Do AutoLayer stuff only if they actually asked for a layer
