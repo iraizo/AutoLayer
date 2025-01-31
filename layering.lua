@@ -370,10 +370,15 @@ function AutoLayer:HandleAutoKick()
     end
 end
 
+function AutoLayer:ProcessRosterUpdate()
+    self:getCurrentLayer()
+end
+
 AutoLayer:RegisterEvent("CHAT_MSG_CHANNEL", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_WHISPER", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_GUILD", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_SYSTEM", "ProcessSystemMessages")
+AutoLayer:RegisterEvent("GROUP_ROSTER_UPDATE", "ProcessRosterUpdate")
 
 function JoinLayerChannel()
     JoinChannelByName("layer")
