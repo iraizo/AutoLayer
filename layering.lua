@@ -356,6 +356,15 @@ function AutoLayer:HandleAutoKick()
 
     if self.db.profile.autokick and #kicked_player_queue >= 0 then
         local name = table.remove(kicked_player_queue, 1)
+
+        if name == nil then
+            return
+        end
+
+        if ~UnitInRaid(name) and ~UnitInParty(name) then
+            return
+        end
+
         self:DebugPrint("Kicking ", name)
         UninviteUnit(name)
     end
