@@ -35,19 +35,20 @@ function AutoLayer:HopGUI()
     selected_layers = {}
   end)
 
-    -- Create send button
-    local send = AceGUI:Create("Button")
-    send:SetText("Send Layer Request")
-    send:SetWidth(160)
-    send:SetCallback("OnClick", function()
-      AutoLayer:SendLayerRequest()
-    end)
+  -- Create send button
+  local send = AceGUI:Create("Button")
+  send:SetText("Send Layer Request")
+  send:SetWidth(160)
+  send:SetCallback("OnClick", function()
+    AutoLayer:SendLayerRequest()
+  end)
 
   -- Check if NovaWorldBuffs is installed
   if addonTable.NWB == nil then
     local desc = AceGUI:Create("Label")
-    desc:SetText("Please consider installing NovaWorldBuffs addon, it allows you to discover current layer and select layers to hop to.")
-    desc:SetColor(1,0,0)
+    desc:SetText(
+    "Please consider installing NovaWorldBuffs addon, it allows you to discover current layer and select layers to hop to.")
+    desc:SetColor(1, 0, 0)
     desc:SetFullWidth(true)
     frame:AddChild(desc)
   else
@@ -60,7 +61,7 @@ function AutoLayer:HopGUI()
     frame:AddChild(header)
 
     send:SetDisabled(true)
-      
+
     local currentLayerGroup = AceGUI:Create("InlineGroup")
     currentLayerGroup:SetFullWidth(true)
     currentLayerGroup:SetLayout("Flow")

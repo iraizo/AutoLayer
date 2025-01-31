@@ -3,11 +3,12 @@ local CTL = _G.ChatThrottleLib
 
 local playersInvitedRecently = {}
 local recentLayerRequests = {}
-local kick_player = nil
+local kicked_player_queue = {}
 
+--- @return boolean is_logging_out Whether the current player is logging out
 local function isPlayerLoggingOut()
     for i = 1, STATICPOPUP_NUMDIALOGS do
-        local frame = _G["StaticPopup"..i]
+        local frame = _G["StaticPopup" .. i]
         if frame and frame:IsShown() and frame.which == "CAMP" then
             return true
         end
@@ -32,17 +33,11 @@ function AutoLayer:pruneCache()
     end
 end
 
-local function containsNumber(str, number)
-    for match in string.gmatch(str, "%d+") do
-        if tonumber(number) == tonumber(match) then
-            return true
-        end
-    end
-    return false
-end
-
+--- @param number number The number to check for in the list.
+--- @param list table<number> The list of numbers to check against.
+--- @return boolean is_in_list Whether the number is in the list.
 local function isNumberInList(number, list)
-    for index, value in ipairs(list) do
+    for _, value in ipairs(list) do
         if value == number then
             return true
         end
@@ -55,10 +50,10 @@ local function removeRealmName(name)
 end
 
 --- Checks if a message contains any word from a given list, with an option to respect word boundaries.
--- @param msg The message to search through.
--- @param listOfWords A list of words to search for in the message.
--- @param respectWordBoundaries (optional) Whether to respect word boundaries in the search. Defaults to true.
--- @return The first word found in the message that matches a word from the list; false otherwise.
+--- @param msg string The message to search through.
+--- @param listOfWords table<string> A list of words to search for in the message.
+--- @param respectWordBoundaries boolean? (optional) Whether to respect word boundaries in the search. Defaults to true.
+--- @return boolean The first word found in the message that matches a word from the list; false otherwise.
 local function containsAnyWordFromList(msg, listOfWords, respectWordBoundaries)
     -- Default to true if not explicitly set
     respectWordBoundaries = respectWordBoundaries ~= false
@@ -79,15 +74,15 @@ local function containsAnyWordFromList(msg, listOfWords, respectWordBoundaries)
         end
     end
 
-    return false -- Return false if nothing matched 
+    return false -- Return false if nothing matched
 end
 
---- Extracts unique, sorted layer numbers from a message.
--- Identifies individual and ranged layer numbers (e.g., "1", "1-3") in a message,
--- compiling them into a sorted list without duplicates.
---
--- @param message string The input string containing layer numbers.
--- @return table List of sorted, unique layer numbers.
+---  Extracts unique, sorted layer numbers from a message.
+---  Identifies individual and ranged layer numbers (e.g., "1", "1-3") in a message,
+---  compiling them into a sorted list without duplicates.
+---
+--- @param message string The input string containing layer numbers.
+--- @return table<number> layer_numbers List of sorted, unique layer numbers.
 local function parseLayers(message)
     local layers = {}
 
@@ -133,6 +128,8 @@ function AutoLayer:ScanLayerFromNWB()
     end
 end
 
+--- Finds the current layer from NovaWorldBuffs
+--- @return number? layer The current layer number, or nil if the layer is unknown.
 function AutoLayer:getCurrentLayer()
     if addonTable.NWB == nil then return end -- No NWB, nothing to do here
     -- If our layer is missing again, try to re-scan it once.
@@ -151,6 +148,16 @@ C_Timer.After(0.1,
         end
     end
 )
+
+function AutoLayer:FindOfflineMembersToKick()
+    for i = 1, GetNumGroupMembers() do
+        local name, _, _, _, _, _, _, online, _, _, _, _ = GetRaidRosterInfo(i)
+
+        if online == false then
+            table.insert(kicked_player_queue, name)
+        end
+    end
+end
 
 ---@diagnostic disable-next-line:inject-field
 function AutoLayer:ProcessMessage(event, msg, name)
@@ -174,12 +181,14 @@ function AutoLayer:ProcessMessage(event, msg, name)
 
     local blacklistMatch = containsAnyWordFromList(msg, AutoLayer:ParseBlacklist(), false)
     if blacklistMatch then
-        self:DebugPrint("Matched blacklist: '", blacklistMatch, "' in message: '", msg, "' from player '", name_without_realm, "'")
+        self:DebugPrint("Matched blacklist: '", blacklistMatch, "' in message: '", msg, "' from player '",
+            name_without_realm, "'")
         return
     end
 
     -- If we got this far, we have a valid match.
-    self:DebugPrint("Matched trigger: '", triggerMatch, "' in message: '", msg, "' from player '", name_without_realm, "'")
+    self:DebugPrint("Matched trigger: '", triggerMatch, "' in message: '", msg, "' from player '", name_without_realm,
+        "'")
 
     if self.db.profile.turnOffWhileRaidAssist and IsInRaid() and UnitIsGroupAssistant("player") then
         self:DebugPrint("Ignoring request because we are raid assist!")
@@ -189,9 +198,10 @@ function AutoLayer:ProcessMessage(event, msg, name)
     local currentLayer = AutoLayer:getCurrentLayer()
     local isHighPriorityRequest = (event == "CHAT_MSG_WHISPER");
 
-    if string.find(msg, "%d+") then -- Uh oh, this player is picky and wants a specific layer!   
+    if string.find(msg, "%d+") then -- Uh oh, this player is picky and wants a specific layer!
         if not currentLayer or currentLayer <= 0 then
-            self:DebugPrint("Message requested a specific layer, but we don't know what layer we're in! NWB says: ", addonTable.NWB.currentLayer)
+            self:DebugPrint("Message requested a specific layer, but we don't know what layer we're in! NWB says: ",
+                addonTable.NWB.currentLayer)
             return
         end
         local requestedLayers = parseLayers(msg)
@@ -217,9 +227,9 @@ function AutoLayer:ProcessMessage(event, msg, name)
     --If we got this far, then the message is a valid layer request that we can fulfill.
 
     -- check if we've already invited this player in the last 5 minutes
-    if not isHighPriorityRequest then 
+    if not isHighPriorityRequest then
         AutoLayer:pruneCache()
-        for i, cachedPlayer in ipairs(playersInvitedRecently) do
+        for _, cachedPlayer in ipairs(playersInvitedRecently) do
             if cachedPlayer.name == name_without_realm and cachedPlayer.time + 300 > time() then
                 self:DebugPrint("Already invited", name, "in the last 5 minutes")
                 return
@@ -236,7 +246,8 @@ function AutoLayer:ProcessMessage(event, msg, name)
 
     ---@diagnostic disable-next-line: undefined-global
     if not isHighPriorityRequest and (not self.db.profile.inviteWhisper or not currentLayer or currentLayer <= 0) then
-        self:DebugPrint("Auto-whisper is turned off or we can't provide a helpful whisper, delaying our invite by 500 miliseconds")
+        self:DebugPrint(
+            "Auto-whisper is turned off or we can't provide a helpful whisper, delaying our invite by 500 miliseconds")
         C_Timer.After(0.5, function()
             if isSeasonal then
                 InviteUnit(name_without_realm)
@@ -252,7 +263,7 @@ function AutoLayer:ProcessMessage(event, msg, name)
         end
     end
 
-    table.insert(recentLayerRequests, { name = name_without_realm, time = time()})
+    table.insert(recentLayerRequests, { name = name_without_realm, time = time() })
     self:DebugPrint("Added", name_without_realm, "to list of recent layer requests")
 
     -- check if group is full
@@ -262,7 +273,8 @@ function AutoLayer:ProcessMessage(event, msg, name)
         -- kick first member after group leader
         for i = 4, GetNumGroupMembers() do
             if UnitIsGroupLeader("player") and i ~= 1 then
-                kick_player = GetRaidRosterInfo(i)
+                local player_tbk = GetRaidRosterInfo(i)
+                table.insert(kicked_player_queue, player_tbk)
             end
         end
 
@@ -331,14 +343,13 @@ function AutoLayer:ProcessSystemMessages(_, a)
             -- Continue with the rest of the function if the player is in the list
 
             local finalMessage = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplate, currentLayer)
-			CTL:SendChatMessage("NORMAL", segments[4], finalMessage, "WHISPER", nil, segments[4])
-		end
-		
-		if self.db.profile.inviteWhisperReminder then
-		
-			local finalMessage2 = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplateReminder)
-			CTL:SendChatMessage("NORMAL", segments[4], finalMessage2, "WHISPER", nil, segments[4])
-		end
+            CTL:SendChatMessage("NORMAL", segments[4], finalMessage, "WHISPER", nil, segments[4])
+        end
+
+        if self.db.profile.inviteWhisperReminder then
+            local finalMessage2 = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplateReminder)
+            CTL:SendChatMessage("NORMAL", segments[4], finalMessage2, "WHISPER", nil, segments[4])
+        end
     end
 end
 
@@ -347,10 +358,10 @@ function AutoLayer:HandleAutoKick()
         return
     end
 
-    if self.db.profile.autokick and kick_player ~= nil then
-        self:DebugPrint("Kicking ", kick_player)
-        UninviteUnit(kick_player)
-        kick_player = nil
+    if self.db.profile.autokick and #kicked_player_queue >= 0 then
+        local name = table.remove(kicked_player_queue, 1)
+        self:DebugPrint("Kicking ", name)
+        UninviteUnit(name)
     end
 end
 
@@ -376,6 +387,7 @@ function JoinLayerChannel()
 end
 
 function ProccessQueue()
+    AutoLayer:HandleAutoKick()
     if #addonTable.send_queue > 0 then
         local payload = table.remove(addonTable.send_queue, 1)
         local l_channel_num = GetChannelName("layer")
