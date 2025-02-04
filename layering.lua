@@ -284,12 +284,12 @@ function AutoLayer:ProcessSystemMessages(_, a)
         return
     end
 
-    local segments = { strsplit(" ", a) }
-
+    pattern = string.format(ERR_ALREADY_IN_GROUP_S, "(%a+)")
+    startIndex, endIndex, characterName = string.find(a, pattern)
     -- X joins the party
-    if segments[2] == "joins" then
-        local playerNameWithoutRealm = removeRealmName(segments[1])
-
+    if startIndex then
+        local playerNameWithoutRealm = removeRealmName(characterName)
+        self:DebugPrint("ERR_ALREADY_IN_GROUP_S", playerNameWithoutRealm, "found !")
         -- Do AutoLayer stuff only if they actually asked for a layer
         -- (this may be a normal player we're inviting for different reasons)
         for i, entry in ipairs(recentLayerRequests) do
@@ -301,18 +301,21 @@ function AutoLayer:ProcessSystemMessages(_, a)
         end
     end
 
+    pattern = string.format(ERR_DECLINE_GROUP_S, "(%a+)")
+    startIndex, endIndex, characterName = string.find(a, pattern)
     -- X declines your invite
-    if segments[2] == "declines" then
-        local playerNameWithoutRealm = removeRealmName(segments[1])
+    if startIndex then
+        self:DebugPrint("ERR_DECLINE_GROUP_S", playerNameWithoutRealm, "found !")
+        local playerNameWithoutRealm = removeRealmName(characterName)
         table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() }) --Extend this timer, they don't want in right now
         self:DebugPrint("Adding ", playerNameWithoutRealm, " to cache, reason: declined invite")
     end
 
-    if segments[3] == "invited" then
-        local playerNameWithoutRealm = removeRealmName(segments[4])
-
-        if playerNameWithoutRealm == "you" then return end -- X has invited you to group
-
+    pattern = string.format( ERR_INVITE_PLAYER_S, "(%a+)")
+    startIndex, endIndex, characterName = string.find(a, pattern)
+    if startIndex then
+        local playerNameWithoutRealm = removeRealmName(characterName)
+        self:DebugPrint("ERR_INVITE_PLAYER_S", playerNameWithoutRealm, "found !")
         if self.db.profile.inviteWhisper then
             local currentLayer = AutoLayer:getCurrentLayer()
 
@@ -339,12 +342,12 @@ function AutoLayer:ProcessSystemMessages(_, a)
             -- Continue with the rest of the function if the player is in the list
 
             local finalMessage = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplate, currentLayer)
-            CTL:SendChatMessage("NORMAL", segments[4], finalMessage, "WHISPER", nil, segments[4])
+            CTL:SendChatMessage("NORMAL", characterName, finalMessage, "WHISPER", nil, characterName)
         end
 
         if self.db.profile.inviteWhisperReminder then
             local finalMessage2 = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplateReminder)
-            CTL:SendChatMessage("NORMAL", segments[4], finalMessage2, "WHISPER", nil, segments[4])
+            CTL:SendChatMessage("NORMAL", characterName, finalMessage2, "WHISPER", nil, characterName)
         end
     end
 end
