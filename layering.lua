@@ -16,6 +16,16 @@ local function isPlayerLoggingOut()
     return false
 end
 
+local function formatWhisperMessage(template, currentLayer)
+	if template:find("{layer}") then
+		template = template:gsub("{layer}", currentLayer)
+    end
+    if template:find("%%s") then
+        template = string.format(template, currentLayer)
+    end
+    return template
+end
+
 function AutoLayer:pruneCache()
     for i, cachedPlayer in ipairs(playersInvitedRecently) do
         -- delete players that are over 5 minutes old
@@ -347,12 +357,12 @@ function AutoLayer:ProcessSystemMessages(_, a)
 
             -- Continue with the rest of the function if the player is in the list
 
-            local finalMessage = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplate, currentLayer)
+            local finalMessage = "[AutoLayer] " .. formatWhisperMessage(self.db.profile.inviteWhisperTemplate, currentLayer)
             CTL:SendChatMessage("NORMAL", characterName, finalMessage, "WHISPER", nil, characterName)
         end
 
         if self.db.profile.inviteWhisperReminder then
-            local finalMessage2 = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplateReminder)
+            local finalMessage2 = "[AutoLayer] " .. formatWhisperMessage(self.db.profile.inviteWhisperTemplateReminder, currentLayer)
             CTL:SendChatMessage("NORMAL", characterName, finalMessage2, "WHISPER", nil, characterName)
         end
     end
