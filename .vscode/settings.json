@@ -48,7 +48,10 @@
         "C_Seasons",
         "InviteUnit",
         "STATICPOPUP_NUMDIALOGS",
-        "NWB_CurrentLayer"
+        "NWB_CurrentLayer",
+        "ERR_ALREADY_IN_GROUP_S",
+        "ERR_DECLINE_GROUP_S",
+        "ERR_INVITE_PLAYER_S"
     ],
     "Lua.diagnostics.disable": [
         "undefined-field",

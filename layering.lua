@@ -266,8 +266,14 @@ function AutoLayer:ProcessMessage(event, msg, name)
     table.insert(recentLayerRequests, { name = name_without_realm, time = time() })
     self:DebugPrint("Added", name_without_realm, "to list of recent layer requests")
 
+    local max_group_size = 4
+
+    if IsInRaid() then
+        max_group_size = 39
+    end
+
     -- check if group is full
-    if self.db.profile.autokick and GetNumGroupMembers() >= 4 then
+    if self.db.profile.autokick and GetNumGroupMembers() == max_group_size then
         self:DebugPrint("Group is full, kicking")
 
         -- kick last member of raid
@@ -311,7 +317,7 @@ function AutoLayer:ProcessSystemMessages(_, a)
         self:DebugPrint("Adding ", playerNameWithoutRealm, " to cache, reason: declined invite")
     end
 
-    pattern = string.format( ERR_INVITE_PLAYER_S, "(%a+)")
+    pattern = string.format(ERR_INVITE_PLAYER_S, "(%a+)")
     startIndex, endIndex, characterName = string.find(a, pattern)
     if startIndex then
         local playerNameWithoutRealm = removeRealmName(characterName)
