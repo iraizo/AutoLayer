@@ -285,17 +285,16 @@ function AutoLayer:ProcessMessage(event, msg, name)
 end
 
 ---@diagnostic disable-next-line: inject-field
-function AutoLayer:ProcessSystemMessages(_, a)
+function AutoLayer:ProcessSystemMessages(_, SystemMessages)
     if not self.db.profile.enabled then
         return
     end
 
-    pattern = string.format(ERR_ALREADY_IN_GROUP_S, "(%a+)")
-    startIndex, endIndex, characterName = string.find(a, pattern)
+    characterName = SystemMessages:match('^'..ERR_JOINED_GROUP_S:format('(.+)'))
     -- X joins the party
-    if startIndex then
+    if characterName then
         local playerNameWithoutRealm = removeRealmName(characterName)
-        self:DebugPrint("ERR_ALREADY_IN_GROUP_S", playerNameWithoutRealm, "found !")
+        self:DebugPrint("ERR_JOINED_GROUP_S", playerNameWithoutRealm, "found !")
         -- Do AutoLayer stuff only if they actually asked for a layer
         -- (this may be a normal player we're inviting for different reasons)
         for i, entry in ipairs(recentLayerRequests) do
@@ -307,19 +306,17 @@ function AutoLayer:ProcessSystemMessages(_, a)
         end
     end
 
-    pattern = string.format(ERR_DECLINE_GROUP_S, "(%a+)")
-    startIndex, endIndex, characterName = string.find(a, pattern)
+    characterName = SystemMessages:match('^'..ERR_DECLINE_GROUP_S:format('(.+)'))
     -- X declines your invite
-    if startIndex then
-        self:DebugPrint("ERR_DECLINE_GROUP_S", playerNameWithoutRealm, "found !")
+    if characterName then
         local playerNameWithoutRealm = removeRealmName(characterName)
+        self:DebugPrint("ERR_DECLINE_GROUP_S", playerNameWithoutRealm, "found !")
         table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() }) --Extend this timer, they don't want in right now
         self:DebugPrint("Adding ", playerNameWithoutRealm, " to cache, reason: declined invite")
     end
 
-    pattern = string.format(ERR_INVITE_PLAYER_S, "(%a+)")
-    startIndex, endIndex, characterName = string.find(a, pattern)
-    if startIndex then
+    characterName = SystemMessages:match('^'..ERR_INVITE_PLAYER_S:format('(.+)'))
+    if characterName then
         local playerNameWithoutRealm = removeRealmName(characterName)
         self:DebugPrint("ERR_INVITE_PLAYER_S", playerNameWithoutRealm, "found !")
         if self.db.profile.inviteWhisper then
