@@ -6,6 +6,24 @@ AutoLayer = LibStub("AceAddon-3.0"):NewAddon("AutoLayer", "AceConsole-3.0", "Ace
 AceGUI = LibStub("AceGUI-3.0")
 local minimap_icon = LibStub("LibDBIcon-1.0")
 
+
+--- A helper function to ensure the length of a whisper won't exceed
+--- the 255 character limit but after currentLayer value substitution.
+--- Assumes layer can be a 2 digit value & assumes "[Autolayer] " preceeds the 
+--- template value in an outgoing whisper message leaving 243 characters to customize.
+local function checkTemplateLength(template)
+    if template:find("{layer}") then
+        template = template:gsub("{layer}", "99")
+    end
+    if template:find("%%s") then
+        template = string.format(template, "99")
+    end
+    if #template > 243 then 
+        return "Value is too long. Maximum length is 243 characters."
+    end
+    return true
+end
+
 local options = {
     name = "AutoLayer",
     handler = AutoLayer,
@@ -111,13 +129,16 @@ local options = {
                     type = 'input',
 					width = 'double',
                     name = 'Whisper Template',
-                    desc = 'Template for invite whispers. Use %s for layer number.',
+                    desc = 'Template for invite whispers. Use {layer} for layer number.',
                     set = function(info, val)
                         AutoLayer.db.profile.inviteWhisperTemplate = val
                     end,
                     get = function(info)
                         return AutoLayer.db.profile.inviteWhisperTemplate
                     end,
+					validate = function(info, val)
+						return checkTemplateLength(val)
+					end,
                     order = 5,
 				},
                 inviteWhisperReminder = {
@@ -143,6 +164,9 @@ local options = {
                     get = function(info)
                         return AutoLayer.db.profile.inviteWhisperTemplateReminder
                     end,
+					validate = function(info, val)
+						return checkTemplateLength(val)
+					end,
                     order = 7,
                 },
             },
@@ -208,7 +232,7 @@ local defaults = {
         blacklist = "wts,wtb,lfm,lfg,ashen,auto inv,autoinv,pst for,guild,raid,enchant,player,what layer,which layer, WorldBuffs",
         invertKeywords = "not,off,except,but,out,other than,besides,apart from",
         inviteWhisper = true,
-        inviteWhisperTemplate = "Inviting you to layer %s...",
+        inviteWhisperTemplate = "Inviting you to layer {layer}...",
 		inviteWhisperReminder = true,
 		inviteWhisperTemplateReminder = "Please Leave Party after layer switch",
         mutesounds = true,
