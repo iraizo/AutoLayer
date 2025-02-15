@@ -362,7 +362,7 @@ function AutoLayer:ProcessSystemMessages(_, a)
         end
 
         if self.db.profile.inviteWhisperReminder then
-            local finalMessage2 = "[AutoLayer] " .. formatWhisperMessage(self.db.profile.inviteWhisperTemplateReminder, currentLayer)
+            local finalMessage2 = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplateReminder)
             CTL:SendChatMessage("NORMAL", characterName, finalMessage2, "WHISPER", nil, characterName)
         end
     end
