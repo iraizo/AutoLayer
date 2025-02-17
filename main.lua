@@ -131,7 +131,7 @@ local options = {
                     type = 'input',
                     width = 1.8,
                     name = 'Channels names for filtering',
-                    desc = 'Comma-separated channel names for filtering.',
+                    desc = 'Comma-separated channel names for filtering. * can be used as a wildcard',
                     set = function(info, val)
                         if val == "" then
                             AutoLayer.db.profile.channelFiltering = "none"
