@@ -89,8 +89,8 @@ function AutoLayer:Toggle()
     self:Print(self.db.profile.enabled and "enabled" or "disabled")
 
     if self.db.profile.enabled then
-        addonTable.bunnyLDB.icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_enabled_icon]]
+        addonTable.bunnyLDB.icon = "Interface\\Icons\\INV_Bijou_Green"
     else
-        addonTable.bunnyLDB.icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_disabled_icon]]
+        addonTable.bunnyLDB.icon = "Interface\\Icons\\INV_Bijou_Red"
     end
 end
