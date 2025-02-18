@@ -17,7 +17,7 @@ AutoLayer is a **community-driven addon** for World of Warcraft designed to faci
 - **Blacklist**: Exclude messages with specific keywords to avoid unwanted triggers.
 - **Invert Keywords**: Specify terms to ignore or exclude particular layers.
 - **Whisper Invites**: Send personalized whispers to players being invited.
-  - **Template Support**: Use `%{layer}` to include the layer number dynamically.
+  - **Template Support**: Use `{layer}` to include the layer number dynamically.
   - **Reminder Text**: Add an optional second line to remind players to leave the group after switching layers.
 
 ### Sound and Behavior

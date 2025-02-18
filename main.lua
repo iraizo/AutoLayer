@@ -261,9 +261,9 @@ function AutoLayer:OnInitialize()
     local icon = ""
 
     if self.db.profile.enabled then
-        icon = "Interface\\Icons\\INV_Bijou_Green"
+        icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_enabled_icon]]
     else
-        icon = "Interface\\Icons\\INV_Bijou_Red"
+        icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_disabled_icon]]
     end
 
     if self.db.profile.mutesounds then
