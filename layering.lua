@@ -87,6 +87,20 @@ local function containsAnyWordFromList(msg, listOfWords, respectWordBoundaries)
     return false -- Return false if nothing matched
 end
 
+local function containsAnyChannelFromList(channelName, listOfChannelNames)
+    local lowerName = string.lower(channelName)
+
+    for _, pattern in ipairs(listOfChannelNames) do
+        local luaPattern = string.gsub(pattern, "%*", ".*")
+
+        if string.match(lowerName, "^" .. luaPattern .. "$") then
+            return channelName -- Return the original channel name if it matches
+        end
+    end
+
+    return nil
+end
+
 ---  Extracts unique, sorted layer numbers from a message.
 ---  Identifies individual and ranged layer numbers (e.g., "1", "1-3") in a message,
 ---  compiling them into a sorted list without duplicates.
@@ -170,7 +184,7 @@ function AutoLayer:FindOfflineMembersToKick()
 end
 
 ---@diagnostic disable-next-line:inject-field
-function AutoLayer:ProcessMessage(event, msg, name)
+function AutoLayer:ProcessMessage(event, msg, name, languageName, channelName, playerName2, specialFlags, zoneChannelID, channelIndex, channelBaseName)
     if not self.db.profile.enabled or isPlayerLoggingOut() then
         return
     end
@@ -196,9 +210,26 @@ function AutoLayer:ProcessMessage(event, msg, name)
         return
     end
 
+    if self.db.profile.channelFiltering == "inclusive" then 
+        local inclusiveChannelMatch = containsAnyChannelFromList(channelBaseName, AutoLayer:ParseFilteredChannels()) 
+        if not inclusiveChannelMatch then
+            self:DebugPrint("Did not match an included channel. Request came from player: '", name, "' in channel: '",
+                channelBaseName , "' but currenty only allowing these channels: '", AutoLayer:GetFilteredChannels(), 
+                    "'")
+            return
+        end
+    elseif self.db.profile.channelFiltering == "exclusive" then
+        local exclusiveChannelMatch = containsAnyChannelFromList(channelBaseName, AutoLayer:ParseFilteredChannels()) 
+        if exclusiveChannelMatch then
+            self:DebugPrint("Matched excluded request from player: '", name, "' in excluded channel: '", 
+                exclusiveChannelMatch, "' from list of excluded channels: '", AutoLayer:GetFilteredChannels(), "'")
+            return
+        end
+    end
+
     -- If we got this far, we have a valid match.
     self:DebugPrint("Matched trigger: '", triggerMatch, "' in message: '", msg, "' from player '", name_without_realm,
-        "'")
+        "' in channel: '", channelBaseName, "'")
 
     if self.db.profile.turnOffWhileRaidAssist and IsInRaid() and UnitIsGroupAssistant("player") then
         self:DebugPrint("Ignoring request because we are raid assist!")
