@@ -87,6 +87,20 @@ local function containsAnyWordFromList(msg, listOfWords, respectWordBoundaries)
     return false -- Return false if nothing matched
 end
 
+local function containsAnyTriggersFromList(msg, listOfTriggers)
+    local lowermsg = string.lower(msg)
+
+    for _, trigger in ipairs(listOfTriggers) do
+        local pattern = string.gsub(trigger, "%*", ".*")
+
+        if string.match(lowermsg, "^" .. pattern .. "$") then
+            return trigger -- Return the trigger that matched
+        end
+    end
+
+    return false
+end
+
 ---  Extracts unique, sorted layer numbers from a message.
 ---  Identifies individual and ranged layer numbers (e.g., "1", "1-3") in a message,
 ---  compiling them into a sorted list without duplicates.
@@ -184,7 +198,7 @@ function AutoLayer:ProcessMessage(event, msg, name)
         return
     end
 
-    local triggerMatch = containsAnyWordFromList(msg, AutoLayer:ParseTriggers(), true)
+    local triggerMatch = containsAnyTriggersFromList(msg, AutoLayer:ParseTriggers())
     if not triggerMatch then
         return
     end
