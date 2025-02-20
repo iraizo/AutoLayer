@@ -87,6 +87,20 @@ local function containsAnyWordFromList(msg, listOfWords, respectWordBoundaries)
     return false -- Return false if nothing matched
 end
 
+local function containsAnyTriggersFromList(msg, listOfTriggers)
+    local lowermsg = string.lower(msg)
+
+    for _, trigger in ipairs(listOfTriggers) do
+        local pattern = string.gsub(trigger, "%*", ".*")
+
+        if string.match(lowermsg, "^" .. pattern .. "$") then
+            return trigger -- Return the trigger that matched
+        end
+    end
+
+    return false
+end
+
 local function containsAnyChannelFromList(channelName, listOfChannelNames)
     local lowerName = string.lower(channelName)
 
@@ -198,7 +212,7 @@ function AutoLayer:ProcessMessage(event, msg, name, languageName, channelName, p
         return
     end
 
-    local triggerMatch = containsAnyWordFromList(msg, AutoLayer:ParseTriggers(), true)
+    local triggerMatch = containsAnyTriggersFromList(msg, AutoLayer:ParseTriggers())
     if not triggerMatch then
         return
     end
