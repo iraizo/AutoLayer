@@ -70,6 +70,18 @@ function AutoLayer:ParseInvertKeywords()
     return invertKeywords
 end
 
+function AutoLayer:GetFilteredChannels(info)
+    return self.db.profile.filteredChannels
+end
+
+function AutoLayer:ParseFilteredChannels()
+    local filteredChannels = {}
+    for channel in string.gmatch(self.db.profile.filteredChannels, "[^,]+") do
+        table.insert(filteredChannels, string.lower(channel))
+    end
+    return filteredChannels
+end
+
 local bunnyLDB = ...
 
 function AutoLayer:Toggle()
