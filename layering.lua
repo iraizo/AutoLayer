@@ -157,7 +157,7 @@ local function parseLayers(message)
     return uniqueLayers
 end
 
-function AutoLayer:ScanLayerFromNWB()
+function AutoLayer:addNWBToAddonTable()
     for name in LibStub("AceAddon-3.0"):IterateAddons() do
         if name == "NovaWorldBuffs" then
             addonTable.NWB = LibStub("AceAddon-3.0"):GetAddon("NovaWorldBuffs")
@@ -170,17 +170,17 @@ end
 --- @return number? layer The current layer number, or nil if the layer is unknown.
 function AutoLayer:getCurrentLayer()
     if addonTable.NWB == nil then return end -- No NWB, nothing to do here
-    -- If our layer is missing again, try to re-scan it once.
-    if addonTable.NWB.currentLayer == nil or addonTable.NWB.currentLayer <= 0 then
-        AutoLayer:ScanLayerFromNWB()
+    
+    if NWB_CurrentLayer == nil or tonumber(NWB_CurrentLayer) == nil or NWB_CurrentLayer <= 0 then
+        return 0
     end
-    return tonumber(addonTable.NWB.currentLayer)
+    return tonumber(NWB_CurrentLayer)
 end
 
 -- Autoexec?
 C_Timer.After(0.1,
     function()
-        AutoLayer:ScanLayerFromNWB()
+        AutoLayer:addNWBToAddonTable()
         if addonTable.NWB == nil then
             AutoLayer:Print("Could not find NovaWorldBuffs, disabling NovaWorldBuffs integration")
         end
@@ -256,7 +256,7 @@ function AutoLayer:ProcessMessage(event, msg, name, languageName, channelName, p
     if string.find(msg, "%d+") then -- Uh oh, this player is picky and wants a specific layer!
         if not currentLayer or currentLayer <= 0 then
             self:DebugPrint("Message requested a specific layer, but we don't know what layer we're in! NWB says: ",
-                addonTable.NWB.currentLayer)
+                NWB_CurrentLayer)
             return
         end
         local requestedLayers = parseLayers(msg)
