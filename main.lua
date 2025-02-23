@@ -113,6 +113,39 @@ local options = {
                     get = 'GetInvertKeywords',
                     order = 3,
                 },
+                channelFiltering = {
+                    type = 'select',
+                    width = 1.2,
+                    name = 'Filter Chat Channels',
+                    desc = 'Select an option to perform inclusive or exclusive chat channel filtering.',
+                    values = {["none"] = "None", ["inclusive"] = "Trigger only these channels", ["exclusive"] = "Trigger all channels except"},
+                    set = function(info, val) 
+                        AutoLayer.db.profile.channelFiltering = val 
+                    end,
+                    get = function(info) 
+                        return AutoLayer.db.profile.channelFiltering 
+                    end,
+                    order = 4,
+                },
+                filteredChannels = {
+                    type = 'input',
+                    width = 1.8,
+                    name = 'Channels names for filtering',
+                    desc = 'Comma-separated channel names for filtering. * can be used as a wildcard',
+                    set = function(info, val)
+                        if val == "" then
+                            AutoLayer.db.profile.channelFiltering = "none"
+                        end
+                        AutoLayer.db.profile.filteredChannels = val
+                    end,
+                    get = function(info)
+                        return AutoLayer.db.profile.filteredChannels
+                    end,
+                    disabled = function()
+                        return AutoLayer.db.profile.channelFiltering == "none"
+                    end,
+                    order = 5,
+                },
                 inviteWhisper = {
                     type = 'toggle',
                     name = 'Whisper Invites',
@@ -123,11 +156,11 @@ local options = {
                     get = function(info)
                         return AutoLayer.db.profile.inviteWhisper
                     end,
-                    order = 4,
+                    order = 6,
                 },
                 inviteWhisperTemplate = {
                     type = 'input',
-					width = 'double',
+                    width = 'double',
                     name = 'Whisper Template',
                     desc = 'Template for invite whispers. Use {layer} for layer number.',
                     set = function(info, val)
@@ -136,11 +169,11 @@ local options = {
                     get = function(info)
                         return AutoLayer.db.profile.inviteWhisperTemplate
                     end,
-					validate = function(info, val)
-						return checkTemplateLength(val)
-					end,
-                    order = 5,
-				},
+                    validate = function(info, val)
+                        return checkTemplateLength(val)
+                    end,
+                    order = 7,
+                },
                 inviteWhisperReminder = {
                     type = 'toggle',
                     name = 'Whisper Reminder Text',
@@ -151,7 +184,7 @@ local options = {
                     get = function(info)
                         return AutoLayer.db.profile.inviteWhisperReminder
                     end,
-                    order = 6,
+                    order = 8,
                 },				
 				inviteWhisperTemplateReminder = {
                     type = 'input',
@@ -167,7 +200,7 @@ local options = {
 					validate = function(info, val)
 						return checkTemplateLength(val)
 					end,
-                    order = 7,
+                    order = 9,
                 },
             },
         },
@@ -231,6 +264,7 @@ local defaults = {
         triggers = "layer",
         blacklist = "wts,wtb,lfm,lfg,ashen,auto inv,autoinv,pst for,guild,raid,enchant,player,what layer,which layer, WorldBuffs",
         invertKeywords = "not,off,except,but,out,other than,besides,apart from",
+        channelFiltering = "none",
         inviteWhisper = true,
         inviteWhisperTemplate = "Inviting you to layer {layer}...",
 		inviteWhisperReminder = true,
