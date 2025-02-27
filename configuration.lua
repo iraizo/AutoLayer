@@ -89,8 +89,22 @@ function AutoLayer:Toggle()
     self:Print(self.db.profile.enabled and "enabled" or "disabled")
 
     if self.db.profile.enabled then
+        if self.db.profile.hideAutoWhispers then
+            self.filterChatEventAutoLayerWhisperMessages()
+        end
+        if self.db.profile.hideSystemGroupMessages then
+            self:filterChatEventSystemGroupMessages()
+        end
+    
         addonTable.bunnyLDB.icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_enabled_icon]]
     else
+        if self.db.profile.hideAutoWhispers then
+            self.unfilterChatEventAutoLayerWhisperMessages()
+        end
+        if self.db.profile.hideSystemGroupMessages then
+            self:unfilterChatEventSystemGroupMessages()
+        end
+
         addonTable.bunnyLDB.icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_disabled_icon]]
     end
 end

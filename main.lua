@@ -252,6 +252,40 @@ local options = {
                     end,
                     order = 3,
                 },
+                hideAutoWhispers = {
+                    type = 'toggle',
+                    name = 'Hide AddOn Whispers',
+                    desc = 'Silence auto whispers sent out by AutoLayer',
+                    set = function(info, val)
+                        AutoLayer.db.profile.hideAutoWhispers = val
+                        if val then
+                            AutoLayer:filterChatEventAutoLayerWhisperMessages()
+                        else
+                            AutoLayer:unfilterChatEventAutoLayerWhisperMessages()
+                        end
+                    end,
+                    get = function(info)
+                        return AutoLayer.db.profile.hideAutoWhispers
+                    end,
+                    order = 4,
+                },
+                hideSystemGroupMessages = {
+                    type = 'toggle',
+                    name = 'Hide Group Notices',
+                    desc = 'Silence system group notices eg. "X has left the party"',
+                    set = function(info, val)
+                        AutoLayer.db.profile.hideSystemGroupMessages = val
+                        if val then
+                            AutoLayer:filterChatEventSystemGroupMessages()
+                        else
+                            AutoLayer:unfilterChatEventSystemGroupMessages()
+                        end
+                    end,
+                    get = function(info)
+                        return AutoLayer.db.profile.hideSystemGroupMessages
+                    end,
+                    order = 5,
+                },
             },
         },
     },
@@ -271,6 +305,8 @@ local defaults = {
 		inviteWhisperTemplateReminder = "Please Leave Party after layer switch",
         mutesounds = true,
         guildOnly = false,
+        hideAutoWhispers = true,
+        hideSystemGroupMessages = true,
         layered = 0,
         minimap = {
             hide = false,
@@ -285,6 +321,27 @@ local annoyingSounds = {
 	567451, -- invite accepted
 	539839, 540356, 540778, 540941, 540984, 542585, 542862, 540287, 540579, 541222, 542952, 542659, 539901, 541298, 543146, 543174 -- "they can't join our group"
 }
+
+local systemMessages = {
+    ERR_INVITE_PLAYER_S,
+    ERR_JOINED_GROUP_S,
+    ERR_DECLINE_GROUP_S,
+    ERR_GROUP_DISBANDED,
+    ERR_LEFT_GROUP_S,
+    ERR_LEFT_GROUP_YOU,
+    ERR_DUNGEON_DIFFICULTY_CHANGED_S,
+    ERR_ALREADY_IN_GROUP_S,
+}
+
+local function matchesAnySystemMessage(msg)
+    for _, systemMessage in ipairs(systemMessages) do            
+        local pattern = systemMessage:gsub("%%s", "(.+)")
+        if msg:match(pattern) then
+            return true
+        end            
+    end
+    return false
+end
 
 
 ---@diagnostic disable-next-line: duplicate-set-field
@@ -302,6 +359,14 @@ function AutoLayer:OnInitialize()
 
     if self.db.profile.mutesounds then
         self:MuteAnnoyingSounds()
+    end
+
+    if self.db.profile.hideAutoWhispers then
+        self.filterChatEventAutoLayerWhisperMessages()
+    end
+
+    if self.db.profile.hideSystemGroupMessages then
+        self:filterChatEventSystemGroupMessages()
     end
 
     ---@diagnostic disable-next-line: missing-fields
@@ -359,6 +424,30 @@ function AutoLayer:UnmuteAnnoyingSounds()
 	for _, soundFileId in pairs(annoyingSounds) do
 		UnmuteSoundFile(soundFileId)
 	end
+end
+
+--For hiding outgoing automatic whispers
+local function whisperInformFilter(self, event, msg, author, ...)            
+    local filtered =  string.sub(msg, 1, 11) == "[AutoLayer]"  
+    return filtered, msg, author,...            
+end        
+function AutoLayer:filterChatEventAutoLayerWhisperMessages()
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", whisperInformFilter)
+end
+function AutoLayer:unfilterChatEventAutoLayerWhisperMessages()
+	ChatFrame_RemoveMessageEventFilter("CHAT_MSG_WHISPER_INFORM", whisperInformFilter)
+end
+
+--For hiding group system messages
+local function systemFilter(self, event, msg, author, ...)
+    local filtered = AutoLayer:GetEnabled() and matchesAnySystemMessage(msg)
+    return filtered, msg, author,...
+end
+function AutoLayer:filterChatEventSystemGroupMessages()
+    ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", systemFilter) 
+end
+function AutoLayer:unfilterChatEventSystemGroupMessages()
+	ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", systemFilter)
 end
 
 function AutoLayer:DebugPrint(...)
