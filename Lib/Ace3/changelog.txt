@@ -1,16 +1,3 @@
-Ace3 Release - Revision r1349 (July 23th, 2024)
------------------------------------------------
-- AceGUI-3.0: EditBoxes: Updated for WoW 11.0 API changes
-
-Ace3 Release - Revision r1341 (May 8th, 2024)
----------------------------------------------
-- AceComm-3.0: Updated ChatThrottleLib for new chat throttling in WoW 4.4.0 and 10.2.7+
-- AceGUI-3.0: Fixed ColorPicker alpha handling on WoW Classic
-
-Ace3 Release - Revision r1320 (January 17th, 2024)
---------------------------------------------------
-- AceGUI-3.0: Colorpicker: Compatibility for WoW 10.2.5
-
 Ace3 Release - Revision r1309 (July 12th, 2023)
 -----------------------------------------------
 - AceDB-3.0: Fixed an issue due to a region change on the PTR

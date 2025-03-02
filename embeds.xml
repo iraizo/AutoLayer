@@ -1,7 +1,7 @@
 <Ui xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
     <Script file="Lib\Ace3\LibStub\LibStub.lua" />
     <Include file="Lib\Ace3\AceGUI-3.0\AceGUI-3.0.xml" />
-    <Include file="Lib\Ace3\AceComm-3.0\ChatThrottleLib.lua" />
+    <Include file="Lib\ChatThrottleLib.lua" />
     <Include file="Lib\LibDeflate\lib.xml" />
     <Include file="Lib\LibSerialize\lib.xml" />
     <Include file="Lib\Ace3\CallbackHandler-1.0\CallbackHandler-1.0.xml" />
@@ -10,6 +10,6 @@
     <Include file="Lib\Ace3\AceConsole-3.0\AceConsole-3.0.xml" />
     <Include file="Lib\Ace3\AceEvent-3.0\AceEvent-3.0.xml" />
     <Include file="Lib\Ace3\AceDB-3.0\AceDB-3.0.xml" />
-    <Include file="Lib\LibDBIcon-1.0\embeds.xml" />
-    <Include file="Lib\LibDBIcon-1.0\LibDBIcon-1.0\lib.xml" />
+    <Include file="Lib\Ace3\LibDBIcon-1.0\embeds.xml" />
+    <Include file="Lib\Ace3\LibDBIcon-1.0\LibDBIcon-1.0\lib.xml" />
 </Ui>

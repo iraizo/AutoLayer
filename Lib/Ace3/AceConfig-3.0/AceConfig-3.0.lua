@@ -3,7 +3,7 @@
 -- as well as associate it with a slash command.
 -- @class file
 -- @name AceConfig-3.0
--- @release $Id$
+-- @release $Id: AceConfig-3.0.lua 1202 2019-05-15 23:11:22Z nevcairiel $
 
 --[[
 AceConfig-3.0
@@ -27,7 +27,7 @@ if not AceConfig then return end
 local pcall, error, type, pairs = pcall, error, type, pairs
 
 -- -------------------------------------------------------------------
--- :RegisterOptionsTable(appName, options, slashcmd)
+-- :RegisterOptionsTable(appName, options, slashcmd, persist)
 --
 -- - appName - (string) application name
 -- - options - table or function ref, see AceConfigRegistry
