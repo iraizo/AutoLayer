@@ -17,8 +17,8 @@ local function isPlayerLoggingOut()
 end
 
 local function formatWhisperMessage(template, currentLayer)
-    if template:find("{layer}") then
-        template = template:gsub("{layer}", currentLayer)
+	if template:find("{layer}") then
+		template = template:gsub("{layer}", currentLayer)
     end
     if template:find("%%s") then
         template = string.format(template, currentLayer)
@@ -170,7 +170,7 @@ end
 --- @return number? layer The current layer number, or nil if the layer is unknown.
 function AutoLayer:getCurrentLayer()
     if addonTable.NWB == nil then return end -- No NWB, nothing to do here
-
+    
     if NWB_CurrentLayer == nil or tonumber(NWB_CurrentLayer) == nil or NWB_CurrentLayer <= 0 then
         return 0
     end
@@ -198,8 +198,7 @@ function AutoLayer:FindOfflineMembersToKick()
 end
 
 ---@diagnostic disable-next-line:inject-field
-function AutoLayer:ProcessMessage(event, msg, name, languageName, channelName, playerName2, specialFlags, zoneChannelID,
-                                  channelIndex, channelBaseName)
+function AutoLayer:ProcessMessage(event, msg, name, languageName, channelName, playerName2, specialFlags, zoneChannelID, channelIndex, channelBaseName)
     if not self.db.profile.enabled or isPlayerLoggingOut() then
         return
     end
@@ -225,18 +224,18 @@ function AutoLayer:ProcessMessage(event, msg, name, languageName, channelName, p
         return
     end
 
-    if self.db.profile.channelFiltering == "inclusive" then
-        local inclusiveChannelMatch = containsAnyChannelFromList(channelBaseName, AutoLayer:ParseFilteredChannels())
+    if self.db.profile.channelFiltering == "inclusive" then 
+        local inclusiveChannelMatch = containsAnyChannelFromList(channelBaseName, AutoLayer:ParseFilteredChannels()) 
         if not inclusiveChannelMatch then
             self:DebugPrint("Did not match an included channel. Request came from player: '", name, "' in channel: '",
-                channelBaseName, "' but currenty only allowing these channels: '", AutoLayer:GetFilteredChannels(),
-                "'")
+                channelBaseName , "' but currenty only allowing these channels: '", AutoLayer:GetFilteredChannels(), 
+                    "'")
             return
         end
     elseif self.db.profile.channelFiltering == "exclusive" then
-        local exclusiveChannelMatch = containsAnyChannelFromList(channelBaseName, AutoLayer:ParseFilteredChannels())
+        local exclusiveChannelMatch = containsAnyChannelFromList(channelBaseName, AutoLayer:ParseFilteredChannels()) 
         if exclusiveChannelMatch then
-            self:DebugPrint("Matched excluded request from player: '", name, "' in excluded channel: '",
+            self:DebugPrint("Matched excluded request from player: '", name, "' in excluded channel: '", 
                 exclusiveChannelMatch, "' from list of excluded channels: '", AutoLayer:GetFilteredChannels(), "'")
             return
         end
@@ -346,7 +345,7 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
         return
     end
 
-    characterName = SystemMessages:match('^' .. ERR_JOINED_GROUP_S:format('(.+)'))
+    characterName = SystemMessages:match('^'..ERR_JOINED_GROUP_S:format('(.+)'))
     -- X joins the party
     if characterName then
         local playerNameWithoutRealm = removeRealmName(characterName)
@@ -362,7 +361,7 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
         end
     end
 
-    characterName = SystemMessages:match('^' .. ERR_DECLINE_GROUP_S:format('(.+)'))
+    characterName = SystemMessages:match('^'..ERR_DECLINE_GROUP_S:format('(.+)'))
     -- X declines your invite
     if characterName then
         local playerNameWithoutRealm = removeRealmName(characterName)
@@ -371,7 +370,7 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
         self:DebugPrint("Adding ", playerNameWithoutRealm, " to cache, reason: declined invite")
     end
 
-    characterName = SystemMessages:match('^' .. ERR_INVITE_PLAYER_S:format('(.+)'))
+    characterName = SystemMessages:match('^'..ERR_INVITE_PLAYER_S:format('(.+)'))
     if characterName then
         local playerNameWithoutRealm = removeRealmName(characterName)
         self:DebugPrint("ERR_INVITE_PLAYER_S", playerNameWithoutRealm, "found !")
@@ -400,14 +399,13 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 
             -- Continue with the rest of the function if the player is in the list
 
-            local finalMessage = "[AutoLayer] " ..
-                formatWhisperMessage(self.db.profile.inviteWhisperTemplate, currentLayer)
-            CTL:SendChatMessage("NORMAL", "AutoLayer", finalMessage, "WHISPER", nil, characterName)
+            local finalMessage = "[AutoLayer] " .. formatWhisperMessage(self.db.profile.inviteWhisperTemplate, currentLayer)
+            CTL:SendChatMessage("NORMAL", characterName, finalMessage, "WHISPER", nil, characterName)
         end
 
         if self.db.profile.inviteWhisperReminder then
             local finalMessage2 = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplateReminder)
-            CTL:SendChatMessage("NORMAL", "AutoLayer", finalMessage2, "WHISPER", nil, characterName)
+            CTL:SendChatMessage("NORMAL", characterName, finalMessage2, "WHISPER", nil, characterName)
         end
     end
 end
@@ -468,7 +466,7 @@ function ProccessQueue()
             JoinLayerChannel()
             do return end
         end
-        CTL:SendChatMessage("BULK", "AutoLayer", payload, "CHANNEL", nil, l_channel_num)
+        CTL:SendChatMessage("BULK", "layer", payload, "CHANNEL", nil, l_channel_num)
     end
 end
 
