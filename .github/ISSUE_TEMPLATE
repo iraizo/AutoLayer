@@ -1,0 +1,74 @@
+name: Bug Report
+description: File a bug report.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  # Checklist section
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      description: Please ensure you have completed the following before submitting this issue.
+      options:
+        - label: I have reproduced this bug without any other addons enabled
+          required: true
+
+  # Describe the bug section
+  - type: textarea
+    id: describe-bug
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is.
+      placeholder: "Example: The game crashes when I open the character menu."
+    validations:
+      required: true
+
+  # Steps to Reproduce section
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Provide a step-by-step guide to reproduce the bug.
+      value: |
+        1.
+        2.
+        3.
+        ...
+    validations:
+      required: true
+
+  # Expected behavior section
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: A clear and concise description of what you expected to happen.
+      placeholder: "Example: The character menu should open without crashing."
+    validations:
+      required: true
+
+  # Screenshots section
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If applicable, add screenshots to help explain your problem.
+      placeholder: "Drag and drop or paste images here."
+
+  # What Wow version section
+  - type: input
+    id: wow-version
+    attributes:
+      label: What Wow version
+      description: Specify the version of World of Warcraft you are using.
+      placeholder: "Example: Retail (Live), Classic Era, Burning Crusade Classic"
+    validations:
+      required: true
+
+  # Additional context section
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add any other context about the problem here.
+      placeholder: "Example: This issue occurs only on specific characters or under certain conditions."
