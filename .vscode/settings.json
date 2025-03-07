@@ -51,7 +51,14 @@
         "NWB_CurrentLayer",
         "ERR_ALREADY_IN_GROUP_S",
         "ERR_DECLINE_GROUP_S",
-        "ERR_INVITE_PLAYER_S"
+        "ERR_INVITE_PLAYER_S",
+        "ERR_JOINED_GROUP_S",
+        "ERR_GROUP_DISBANDED",
+        "ERR_LEFT_GROUP_S",
+        "ERR_LEFT_GROUP_YOU",
+        "ERR_DUNGEON_DIFFICULTY_CHANGED_S",
+        "ChatFrame_AddMessageEventFilter",
+        "ChatFrame_RemoveMessageEventFilter"
     ],
     "Lua.diagnostics.disable": [
         "undefined-field",
