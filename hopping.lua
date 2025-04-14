@@ -29,6 +29,10 @@ function AutoLayer:HopGUI()
   frame:SetStatusText("Beta feature")
   frame:SetLayout("Flow")
 
+  -- Register the frame so it closes when pressing ESC
+  _G["AutoLayerHopperFrame"] = frame.frame
+  tinsert(UISpecialFrames, "AutoLayerHopperFrame")
+
   -- Set a background color and padding
   frame:SetCallback("OnClose", function()
     is_closed = true
