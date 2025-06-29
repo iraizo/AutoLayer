@@ -1,4 +1,3 @@
----@diagnostic disable: inject-field
 local addonName, addonTable = ...;
 
 function AutoLayer:SetDebug(info, val)
