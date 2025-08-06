@@ -62,7 +62,7 @@ ChatThrottleLib.MSG_OVERHEAD = 40		-- Guesstimate overhead for sending a message
 
 ChatThrottleLib.BURST = 4000				-- WoW's server buffer seems to be about 32KB. 8KB should be safe, but seen disconnects on _some_ servers. Using 4KB now.
 
-ChatThrottleLib.MIN_FPS = 20				-- Reduce output CPS to half (and don't burst) if FPS drops below this value
+ChatThrottleLib.MIN_FPS = 30				-- Reduce output CPS to half (and don't burst) if FPS drops below this value
 
 
 local setmetatable = setmetatable
@@ -530,5 +530,6 @@ if(WOWB_VER) then
 	ChatThrottleLib.Frame:RegisterEvent("CHAT_MSG_SAY")
 end
 ]]
+
 
 
