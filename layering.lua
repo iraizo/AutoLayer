@@ -9,7 +9,7 @@ local kicked_player_queue = {}
 local function isPlayerLoggingOut()
     local isLoggingOut = false
     StaticPopup_ForEachShownDialog(function(frame)
-        if frame.which == "CAMP" then
+        if frame and frame:IsShown() and frame.which == "CAMP" then
             isLoggingOut = true
             return true
         end
