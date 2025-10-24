@@ -7,13 +7,14 @@ local kicked_player_queue = {}
 
 --- @return boolean is_logging_out Whether the current player is logging out
 local function isPlayerLoggingOut()
-    for i = 1, STATICPOPUP_NUMDIALOGS do
-        local frame = _G["StaticPopup" .. i]
+    local isLoggingOut = false
+    StaticPopup_ForEachShownDialog(function(frame)
         if frame and frame:IsShown() and frame.which == "CAMP" then
+            isLoggingOut = true
             return true
         end
-    end
-    return false
+    end)
+    return isLoggingOut
 end
 
 local function formatWhisperMessage(template, currentLayer)
