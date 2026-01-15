@@ -365,7 +365,18 @@ end
 function AutoLayer:OnInitialize()
 	LibStub("AceConfig-3.0"):RegisterOptionsTable("AutoLayer", options)
 	self.db = LibStub("AceDB-3.0"):New("AutoLayerDB", defaults)
-	self.optionsFrame = LibStub("AceConfigDialog-3.0"):AddToBlizOptions("AutoLayer", "AutoLayer")
+	
+	-- Modern API for adding options
+	local AceConfigDialog = LibStub("AceConfigDialog-3.0")
+	AceConfigDialog:SetDefaultSize("AutoLayer", 600, 500)
+	
+	-- Register slash commands to open options
+	self:RegisterChatCommand("autolayer", function()
+		AceConfigDialog:Open("AutoLayer")
+	end)
+	self:RegisterChatCommand("al", function()
+		AceConfigDialog:Open("AutoLayer")
+	end)
 	local icon = ""
 
 	if self.db.profile.enabled then

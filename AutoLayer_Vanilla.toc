@@ -1,4 +1,4 @@
-## Interface: 11508
+## Interface: 20505
 ## Title: AutoLayer
 ## Notes: Automatically invites people that want to layer switch
 ## Author: raizo
