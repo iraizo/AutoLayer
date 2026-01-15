@@ -351,16 +351,16 @@ function AutoLayer:ProcessMessage(
 		)
 		C_Timer.After(0.5, function()
 			if isSeasonal then
-				InviteUnit(name_without_realm)
+				C_PartyInfo.InviteUnit(name_without_realm)
 			else
-				InviteUnit(name)
+				C_PartyInfo.InviteUnit(name)
 			end
 		end)
 	else
 		if isSeasonal then
-			InviteUnit(name_without_realm)
+			C_PartyInfo.InviteUnit(name_without_realm)
 		else
-			InviteUnit(name)
+			C_PartyInfo.InviteUnit(name)
 		end
 	end
 
@@ -474,7 +474,7 @@ function AutoLayer:HandleAutoKick()
 		end
 
 		self:DebugPrint("Kicking ", name)
-		UninviteUnit(name)
+		C_PartyInfo.UninviteUnit(name)
 	end
 end
 
