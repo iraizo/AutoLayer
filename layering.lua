@@ -351,7 +351,7 @@ function AutoLayer:ProcessMessage(
 	local isSeasonal = C_Seasons.HasActiveSeason()
 
 	---@diagnostic disable-next-line: undefined-global
-	if GetNumGroupMembers() < max_group_size then
+	if GetNumGroupMembers() <= max_group_size then
 		if not isHighPriorityRequest and (not self.db.profile.inviteWhisper or not currentLayer or currentLayer <= 0) then
 			self:DebugPrint(
 				"Auto-whisper is turned off or we can't provide a helpful whisper, delaying our invite by 500 miliseconds"
