@@ -337,6 +337,12 @@ function AutoLayer:ProcessMessage(
 		end
 	end
 
+	local max_group_size = 4
+
+	if IsInRaid() then
+		max_group_size = 39
+	end
+
 	-- used to check if we should invite with or without realm name below
 	-- due to the fact that era has mega servers (multiple realms in one server)
 	-- where we have to invite with the realm name
@@ -345,33 +351,31 @@ function AutoLayer:ProcessMessage(
 	local isSeasonal = C_Seasons.HasActiveSeason()
 
 	---@diagnostic disable-next-line: undefined-global
-	if not isHighPriorityRequest and (not self.db.profile.inviteWhisper or not currentLayer or currentLayer <= 0) then
-		self:DebugPrint(
-			"Auto-whisper is turned off or we can't provide a helpful whisper, delaying our invite by 500 miliseconds"
-		)
-		C_Timer.After(0.5, function()
+	if GetNumGroupMembers() <= max_group_size then
+		if not isHighPriorityRequest and (not self.db.profile.inviteWhisper or not currentLayer or currentLayer <= 0) then
+			self:DebugPrint(
+				"Auto-whisper is turned off or we can't provide a helpful whisper, delaying our invite by 500 miliseconds"
+			)
+			C_Timer.After(0.5, function()
+				if isSeasonal then
+					C_PartyInfo.InviteUnit(name_without_realm)
+				else
+					C_PartyInfo.InviteUnit(name)
+				end
+			end)
+		else
 			if isSeasonal then
 				C_PartyInfo.InviteUnit(name_without_realm)
 			else
 				C_PartyInfo.InviteUnit(name)
 			end
-		end)
-	else
-		if isSeasonal then
-			C_PartyInfo.InviteUnit(name_without_realm)
-		else
-			C_PartyInfo.InviteUnit(name)
 		end
+	else
+		self:DebugPrint("Group is already full. Cannot invite", name_without_realm)
 	end
 
 	table.insert(recentLayerRequests, { name = name_without_realm, time = time() })
 	self:DebugPrint("Added", name_without_realm, "to list of recent layer requests")
-
-	local max_group_size = 4
-
-	if IsInRaid() then
-		max_group_size = 39
-	end
 
 	-- check if group is full
 	if self.db.profile.autokick and GetNumGroupMembers() == max_group_size then
