@@ -338,6 +338,25 @@ local annoyingSounds = {
 	541298,
 	543146,
 	543174, -- "they can't join our group"
+	-- When the group is full, mute the sound that plays for the failed invitation, this can happen on busy realms
+	539272, -- BloodElfFemale_CantInvite
+	539274, -- BloodElfMale_CantInvite
+	539663, -- DraeneiFemale_CantInvite
+	539503, -- DraeneiMale_CantInvite
+	539844, -- DwarfFemale_CantInvite
+	539947, -- DwarfMale_CantInvite
+	540320, -- GnomeFemale_CantInvite
+	540404, -- GnomeMale_CantInvite
+	540798, -- HumanMale_CantInvite
+	540559, -- HumanFemale_CantInvite
+	540933, -- NightElfFemale_CantInvite
+	540967, -- NightElfMale_CantInvite
+	541188, -- OrcFemale_CantInvite
+	541258, -- OrcMale_CantInvite
+	542828, -- TaurenFemale_CantInvite
+	542912, -- TaurenMale_CantInvite
+	543102, -- TrollFemale_CantInvite
+	542912, -- TrollMale_CantInvite
 }
 
 local systemMessages = {
@@ -349,6 +368,8 @@ local systemMessages = {
 	ERR_LEFT_GROUP_YOU,
 	ERR_DUNGEON_DIFFICULTY_CHANGED_S,
 	ERR_ALREADY_IN_GROUP_S,
+	ERR_GROUP_FULL,
+	ERR_NOT_IN_GROUP,
 }
 
 local function matchesAnySystemMessage(msg)

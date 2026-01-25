@@ -2,6 +2,7 @@ local addonName, addonTable = ...
 local CTL = _G.ChatThrottleLib
 
 local playersInvitedRecently = {}
+local pendingPlayerInvites = {}
 local recentLayerRequests = {}
 local kicked_player_queue = {}
 
@@ -40,6 +41,13 @@ function AutoLayer:pruneCache()
 		if cachedPlayer.time + 60 < time() then
 			self:DebugPrint("Removing ", cachedPlayer.name, " from recent layer requests")
 			table.remove(recentLayerRequests, i)
+		end
+	end
+	for i, cachedPlayer in ipairs(pendingPlayerInvites) do
+		-- delete pending invites for players that are over 3 minutes old
+		if cachedPlayer.time + 180 < time() then
+			self:DebugPrint("Removing ", cachedPlayer.name, " from pending player invites")
+			table.remove(pendingPlayerInvites, i)
 		end
 	end
 end
@@ -351,7 +359,8 @@ function AutoLayer:ProcessMessage(
 	local isSeasonal = C_Seasons.HasActiveSeason()
 
 	---@diagnostic disable-next-line: undefined-global
-	if GetNumGroupMembers() <= max_group_size then
+	if (GetNumGroupMembers() + #pendingPlayerInvites) <= max_group_size then
+		self:DebugPrint("Group has room (", GetNumGroupMembers(), "in group +", #pendingPlayerInvites, "pending invites). Inviting", name_without_realm, "to layer", currentLayer)
 		if not isHighPriorityRequest and (not self.db.profile.inviteWhisper or not currentLayer or currentLayer <= 0) then
 			self:DebugPrint(
 				"Auto-whisper is turned off or we can't provide a helpful whisper, delaying our invite by 500 miliseconds"
@@ -371,7 +380,7 @@ function AutoLayer:ProcessMessage(
 			end
 		end
 	else
-		self:DebugPrint("Group is already full. Cannot invite", name_without_realm)
+		self:DebugPrint("Group is already full (", GetNumGroupMembers(), "in group +", #pendingPlayerInvites, "pending invites). Cannot invite", name_without_realm)
 	end
 
 	table.insert(recentLayerRequests, { name = name_without_realm, time = time() })
@@ -409,6 +418,14 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 				break -- Found the player, no need to continue checking
 			end
 		end
+		-- Player accepted invite, remove from pending invites
+		for i, entry in ipairs(pendingPlayerInvites) do
+			if entry.name == playerNameWithoutRealm then
+				self:DebugPrint("Removing ", playerNameWithoutRealm, " from pending invites, reason: accepted invite")
+				table.remove(pendingPlayerInvites, i)
+				break -- Found the player, no need to continue checking
+			end
+		end
 	end
 
 	characterName = SystemMessages:match("^" .. ERR_DECLINE_GROUP_S:format("(.+)"))
@@ -418,12 +435,36 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 		self:DebugPrint("ERR_DECLINE_GROUP_S", playerNameWithoutRealm, "found !")
 		table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() }) --Extend this timer, they don't want in right now
 		self:DebugPrint("Adding ", playerNameWithoutRealm, " to cache, reason: declined invite")
+
+		-- Player declined invite, remove from pending invites
+		for i, entry in ipairs(pendingPlayerInvites) do
+			if entry.name == playerNameWithoutRealm then
+				self:DebugPrint("Removing ", playerNameWithoutRealm, " from pending invites, reason: declined invite")
+				table.remove(pendingPlayerInvites, i)
+				break -- Found the player, no need to continue checking
+			end
+		end
 	end
 
 	characterName = SystemMessages:match("^" .. ERR_INVITE_PLAYER_S:format("(.+)"))
 	if characterName then
 		local playerNameWithoutRealm = removeRealmName(characterName)
 		self:DebugPrint("ERR_INVITE_PLAYER_S", playerNameWithoutRealm, "found !")
+
+		-- Player was invited, add to pending invites
+		table.insert(pendingPlayerInvites, { name = playerNameWithoutRealm, time = time() })
+		self:DebugPrint("Adding ", playerNameWithoutRealm, " to pending invites")
+		-- Set a timer for 3 minutes, if after that time they are still in pending invites, remove them and consider the invite timed out
+		C_Timer.After(180, function()
+			for i, entry in ipairs(pendingPlayerInvites) do
+				if entry.name == playerNameWithoutRealm then
+					self:DebugPrint("Removing ", playerNameWithoutRealm, " from pending invites, reason: invite timed out")
+					table.remove(pendingPlayerInvites, i)
+					break -- Found the player, no need to continue checking
+				end
+			end
+		end)
+
 		if self.db.profile.inviteWhisper then
 			local currentLayer = AutoLayer:getCurrentLayer()
 
