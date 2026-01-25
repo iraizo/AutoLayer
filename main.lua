@@ -353,7 +353,10 @@ local systemMessages = {
 
 local function matchesAnySystemMessage(msg)
 	for _, systemMessage in ipairs(systemMessages) do
-		local pattern = systemMessage:gsub("%%s", "(.+)")
+		-- First escape all Lua pattern special characters
+        local pattern = systemMessage:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
+        -- Now replace the escaped %%s with capture pattern
+        pattern = pattern:gsub("%%%%s", "(.+)")
 		if msg:match(pattern) then
 			return true
 		end
