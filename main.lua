@@ -338,6 +338,10 @@ local annoyingSounds = {
 	541298,
 	543146,
 	543174, -- "they can't join our group"
+	539218, -- BloodElfMale_AlreadyInGroup
+	539307, -- BloodElfFemale_AlreadyInGroup
+	539481, -- DraeneiMale_AlreadyInGroup
+	539729, -- DraeneiFemale_AlreadyInGroup
 	-- When the group is full, mute the sound that plays for the failed invitation, this can happen on busy realms
 	539272, -- BloodElfFemale_CantInvite
 	539274, -- BloodElfMale_CantInvite
