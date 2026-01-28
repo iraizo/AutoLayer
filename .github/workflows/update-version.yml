@@ -1,0 +1,58 @@
+name: Update Version on Release
+
+on:
+  push:
+    tags:
+      - '*-release'
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+      
+      - name: Extract version number
+        id: extract_version
+        run: |
+          # Extract version from tag name (e.g., 1.2.3-release -> 1.2.3)
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          VERSION=$(echo "$TAG_NAME" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+)(-release)?$/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION from tag $TAG_NAME"
+      
+      - name: Update .toc file
+        run: |
+          VERSION="${{ steps.extract_version.outputs.version }}"
+          sed -i "s/^## Version: .*$/## Version: $VERSION/" AutoLayer_Vanilla.toc
+          echo "Updated AutoLayer_Vanilla.toc to version $VERSION"
+      
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add AutoLayer_Vanilla.toc
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          # Commit the change
+          git commit -m "Update version to ${{ steps.extract_version.outputs.version }}"
+          
+          # Delete the old tag
+          git tag -d "$GITHUB_REF_NAME"
+          git push origin :refs/tags/$GITHUB_REF_NAME
+          
+          # Create new tag on the updated commit
+          git tag "$GITHUB_REF_NAME"
+          
+          # Push the commit and the new tag
+          git push origin HEAD:${{ github.event.repository.default_branch }}
+          git push origin "$GITHUB_REF_NAME"
