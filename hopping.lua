@@ -14,6 +14,7 @@ function AutoLayer:SendLayerRequest()
 	LeaveParty()
 	table.insert(addonTable.send_queue, res)
 	AutoLayer:DebugPrint("Sending layer request: " .. res)
+	ProccessQueue()
 end
 
 function AutoLayer:HopGUI()
