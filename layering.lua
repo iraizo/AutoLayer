@@ -7,8 +7,7 @@ local recentLayerRequests = {}
 local kicked_player_queue = {}
 
 -- Dynamic channel name system with date-based hashing
-local channelJoinAttempts = {} -- Track join attempts per channel
-local MAX_JOIN_ATTEMPTS = 3
+local failedChannels = {} -- Track channels that failed to join (no retries)
 addonTable.activeLayerChannel = nil
 
 -- Channel list - will be populated after all addons load
@@ -17,6 +16,10 @@ local LAYER_CHANNELS = {}
 -- Generate dynamic channel names based on server date and realm name
 local function GenerateLayerChannels()
 	local channels = {}
+
+	-- Always include the static "layer" channel first as primary/fallback
+	table.insert(channels, "layer")
+
 	local t = C_DateAndTime.GetCurrentCalendarTime()
 	local realmName = GetRealmName() or "Unknown"
 
@@ -608,31 +611,33 @@ AutoLayer:RegisterEvent("GROUP_ROSTER_UPDATE", "ProcessRosterUpdate")
 
 function JoinLayerChannel()
 	-- Join ALL channels to prevent griefing (so griefers can't become admin in empty channels)
-	-- But only try each channel up to MAX_JOIN_ATTEMPTS times to avoid password popup spam
+	-- Only try each channel once - if it fails (e.g. password protected), don't retry
 	for _, channelName in ipairs(LAYER_CHANNELS) do
-		channelJoinAttempts[channelName] = channelJoinAttempts[channelName] or 0
-		if channelJoinAttempts[channelName] < MAX_JOIN_ATTEMPTS then
+		if not failedChannels[channelName] then
 			local channel_num = GetChannelName(channelName)
 			if channel_num == 0 then
-				channelJoinAttempts[channelName] = channelJoinAttempts[channelName] + 1
-				AutoLayer:DebugPrint("Attempting to join '" .. channelName .. "' (attempt " .. channelJoinAttempts[channelName] .. "/" .. MAX_JOIN_ATTEMPTS .. ")")
+				AutoLayer:DebugPrint("Attempting to join '" .. channelName .. "'")
 				JoinChannelByName(channelName)
+				-- Mark as failed immediately - if join succeeds, we'll detect it via GetChannelName later
+				-- If it fails (password protected), we won't try again this session
+				failedChannels[channelName] = true
 			end
 		end
 	end
 
-	-- Determine which channel to use for sending (priority: layer > layer2 > layer3)
+	-- Determine which channel to use for sending (priority order matches LAYER_CHANNELS)
 	addonTable.activeLayerChannel = nil
 	for _, channelName in ipairs(LAYER_CHANNELS) do
 		local channel_num = GetChannelName(channelName)
 		if channel_num > 0 then
+			-- Channel successfully joined - clear failed flag if set
+			failedChannels[channelName] = nil
 			if not addonTable.activeLayerChannel then
 				addonTable.activeLayerChannel = channelName
 			end
 		else
-			-- Channel unavailable (password protected or max attempts reached)
-			if channelJoinAttempts[channelName] >= MAX_JOIN_ATTEMPTS then
-				AutoLayer:DebugPrint("Channel '" .. channelName .. "' skipped (max attempts reached)")
+			if failedChannels[channelName] then
+				AutoLayer:DebugPrint("Channel '" .. channelName .. "' skipped (failed to join)")
 			end
 		end
 	end
