@@ -6,11 +6,64 @@ local pendingPlayerInvites = {}
 local recentLayerRequests = {}
 local kicked_player_queue = {}
 
--- Fallback channel system
-local LAYER_CHANNELS = {"layer", "layer2", "layer3"}
+-- Dynamic channel name system with date-based hashing
 local channelJoinAttempts = {} -- Track join attempts per channel
 local MAX_JOIN_ATTEMPTS = 3
 addonTable.activeLayerChannel = nil
+
+-- Channel list - will be populated after all addons load
+local LAYER_CHANNELS = {}
+
+-- Generate dynamic channel names based on server date and realm name
+local function GenerateLayerChannels()
+	local channels = {}
+	local t = C_DateAndTime.GetCurrentCalendarTime()
+	local realmName = GetRealmName() or "Unknown"
+
+	-- Need LibDeflate for hashing
+	local LibDeflate = addonTable.LibDeflate or LibStub and LibStub("LibDeflate")
+	if not LibDeflate then
+		AutoLayer:Print("Error: LibDeflate not found, using fallback channel names")
+		return {"layer", "layer2", "layer3"}
+	end
+
+	-- Three date formats for three different channel names
+	local dateFormats = {
+		string.format("%02d-%02d-%04d", t.monthDay, t.month, t.year),  -- dd-mm-yyyy
+		string.format("%04d-%02d-%02d", t.year, t.month, t.monthDay),  -- yyyy-mm-dd
+		string.format("%02d-%02d-%04d", t.month, t.monthDay, t.year),  -- mm-dd-yyyy
+	}
+
+	for i, dateStr in ipairs(dateFormats) do
+		local saltedInput = realmName .. "-" .. dateStr
+		local hash = LibDeflate:Adler32(saltedInput)
+		-- Convert hash to hex string and take first 8 characters
+		local hashStr = string.format("%08x", hash)
+		table.insert(channels, "layer" .. hashStr)
+	end
+
+	return channels
+end
+
+-- Leave all old layer_* channels that are not in today's channel list
+local function CleanupOldLayerChannels()
+	-- Build a lookup table for today's valid channels
+	local validChannels = {}
+	for _, channelName in ipairs(LAYER_CHANNELS) do
+		validChannels[channelName] = true
+	end
+
+	-- Check all joined channels and leave old layer_* ones
+	for i = 1, MAX_WOW_CHAT_CHANNELS or 20 do
+		local _, channelName = GetChannelName(i)
+		if channelName and string.match(channelName, "^layer%x%x%x%x%x%x%x%x$") then
+			if not validChannels[channelName] then
+				AutoLayer:DebugPrint("Leaving old layer channel: " .. channelName)
+				LeaveChannelByName(channelName)
+			end
+		end
+	end
+end
 
 --- @return boolean is_logging_out Whether the current player is logging out
 local function isPlayerLoggingOut()
@@ -200,6 +253,20 @@ C_Timer.After(0.1, function()
 	if addonTable.NWB == nil then
 		AutoLayer:Print("Could not find NovaWorldBuffs, disabling NovaWorldBuffs integration")
 	end
+
+	-- Generate dynamic channel names now that LibDeflate is loaded
+	local generatedChannels = GenerateLayerChannels()
+	for i, ch in ipairs(generatedChannels) do
+		LAYER_CHANNELS[i] = ch
+	end
+
+	-- Debug: Show generated channel names
+	AutoLayer:DebugPrint("Dynamic layer channels for today:")
+	for i, channelName in ipairs(LAYER_CHANNELS) do
+		AutoLayer:DebugPrint("  " .. i .. ": " .. channelName)
+	end
+	-- Cleanup old layer channels from previous days
+	CleanupOldLayerChannels()
 end)
 
 function AutoLayer:FindOfflineMembersToKick()
@@ -570,11 +637,12 @@ function JoinLayerChannel()
 		end
 	end
 
-	-- Inform user if we had to use a fallback
-	if addonTable.activeLayerChannel and addonTable.activeLayerChannel ~= "layer" then
-		AutoLayer:Print("Channel 'layer' unavailable, using fallback: " .. addonTable.activeLayerChannel)
+	-- Inform user if we had to use a fallback (first channel in list is primary)
+	local primaryChannel = LAYER_CHANNELS[1]
+	if addonTable.activeLayerChannel and addonTable.activeLayerChannel ~= primaryChannel then
+		AutoLayer:Print("Primary channel unavailable, using fallback: " .. addonTable.activeLayerChannel)
 	elseif not addonTable.activeLayerChannel then
-		AutoLayer:Print("All layer channels unavailable (layer, layer2, layer3)")
+		AutoLayer:Print("All layer channels unavailable")
 	end
 
 	-- Remove all layer channels from chat frames (so they don't clutter the chat)
