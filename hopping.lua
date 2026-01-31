@@ -16,6 +16,42 @@ function AutoLayer:SendLayerRequest()
 	AutoLayer:DebugPrint("Sending layer request: " .. res)
 end
 
+function AutoLayer:SlashCommandRequest(input)
+	if not is_closed then
+		return self:Print("Hopper GUI is already open. Use either the GUI or slash commands, not both.")
+	end
+
+	selected_layers = {}
+	local slash_layers = self:GetArgs(input, 1, 5)
+
+	if slash_layers and slash_layers ~= "" then
+		self:DebugPrint("Received slash command request for layers:", slash_layers)
+
+		for layer in string.gmatch(slash_layers, '(%d+)') do
+			table.insert(selected_layers, layer)
+		end
+
+		if #selected_layers == 0 then
+			self:Print("No valid layers specified in the request. Use a comma-separated list of layer numbers. For example: /autolayer req 1,2,3")
+			return
+		end
+	else
+		self:DebugPrint("Received slash command request for all layers except current ( layer", NWB_CurrentLayer, ").")
+
+		local count = 0
+		for _ in pairs(addonTable.NWB.data.layers) do
+			count = count + 1
+			if count ~= NWB_CurrentLayer then
+				table.insert(selected_layers, tostring(count))
+			end
+		end
+	end
+
+	if #selected_layers > 0 then
+		AutoLayer:SendLayerRequest()
+	end
+end
+
 function AutoLayer:HopGUI()
 	if not is_closed then
 		return

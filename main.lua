@@ -398,9 +398,13 @@ function AutoLayer:OnInitialize()
 	local AceConfigDialog = LibStub("AceConfigDialog-3.0")
 	AceConfigDialog:SetDefaultSize("AutoLayer", 600, 500)
 	
-	-- Register slash commands to open options
-	self:RegisterChatCommand("autolayer", function()
-		AceConfigDialog:Open("AutoLayer")
+	-- Register slash commands
+	self:RegisterChatCommand("autolayer", function(input)
+		if input == "" then
+			AceConfigDialog:Open("AutoLayer")
+		else
+			AutoLayer:SlashCommand(input)
+		end
 	end)
 	self:RegisterChatCommand("al", function()
 		AceConfigDialog:Open("AutoLayer")
@@ -504,6 +508,24 @@ function AutoLayer:filterChatEventSystemGroupMessages()
 end
 function AutoLayer:unfilterChatEventSystemGroupMessages()
 	ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", systemFilter)
+end
+
+function AutoLayer:SlashCommand(input)
+	local command = self:GetArgs(input, 1)
+
+	if command == "help" then
+		return AutoLayer:SlashCommandHelp()
+	elseif command == "req" then
+		return AutoLayer:SlashCommandRequest(input)
+	else
+		return self:Print("Unknown command " .. command .. ". Type /autolayer help for a list of commands.")
+	end
+end
+
+function AutoLayer:SlashCommandHelp()
+	self:Print("AutoLayer Slash Commands:")
+	self:Print("/autolayer or /al - Open the AutoLayer settings GUI.")
+	self:Print("/autolayer req [layers] - Send a layer hop request via chat. '[layers]' is a comma-separated list of layer numbers to request. If omitted, requests all layers except the current one.")
 end
 
 function AutoLayer:DebugPrint(...)
