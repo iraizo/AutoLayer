@@ -56,13 +56,20 @@ local function CleanupOldLayerChannels()
 		validChannels[channelName] = true
 	end
 
+	AutoLayer:DebugPrint("CleanupOldLayerChannels: Checking for old channels to leave...")
+
 	-- Check all joined channels and leave old layer_* ones
 	for i = 1, MAX_WOW_CHAT_CHANNELS or 20 do
 		local _, channelName = GetChannelName(i)
+		if channelName then
+			AutoLayer:DebugPrint("  Found channel: " .. channelName)
+		end
 		if channelName and string.match(channelName, "^layer%x%x%x%x%x%x%x%x$") then
 			if not validChannels[channelName] then
-				AutoLayer:DebugPrint("Leaving old layer channel: " .. channelName)
+				AutoLayer:DebugPrint("  LEAVING old layer channel: " .. channelName)
 				LeaveChannelByName(channelName)
+			else
+				AutoLayer:DebugPrint("  KEEPING valid layer channel: " .. channelName)
 			end
 		end
 	end
@@ -612,52 +619,60 @@ AutoLayer:RegisterEvent("GROUP_ROSTER_UPDATE", "ProcessRosterUpdate")
 function JoinLayerChannel()
 	-- Join ALL channels to prevent griefing (so griefers can't become admin in empty channels)
 	-- Only try each channel once - if it fails (e.g. password protected), don't retry
+
+	-- Step 1: Attempt to join all channels that are not marked as failed
 	for _, channelName in ipairs(LAYER_CHANNELS) do
 		if not failedChannels[channelName] then
 			local channel_num = GetChannelName(channelName)
 			if channel_num == 0 then
 				AutoLayer:DebugPrint("Attempting to join '" .. channelName .. "'")
 				JoinChannelByName(channelName)
-				-- Mark as failed immediately - if join succeeds, we'll detect it via GetChannelName later
-				-- If it fails (password protected), we won't try again this session
-				failedChannels[channelName] = true
-			end
-		end
-	end
-
-	-- Determine which channel to use for sending (priority order matches LAYER_CHANNELS)
-	addonTable.activeLayerChannel = nil
-	for _, channelName in ipairs(LAYER_CHANNELS) do
-		local channel_num = GetChannelName(channelName)
-		if channel_num > 0 then
-			-- Channel successfully joined - clear failed flag if set
-			failedChannels[channelName] = nil
-			if not addonTable.activeLayerChannel then
-				addonTable.activeLayerChannel = channelName
 			end
 		else
-			if failedChannels[channelName] then
-				AutoLayer:DebugPrint("Channel '" .. channelName .. "' skipped (failed to join)")
-			end
+			AutoLayer:DebugPrint("Channel '" .. channelName .. "' skipped (previously failed to join)")
 		end
 	end
 
-	-- Inform user if we had to use a fallback (first channel in list is primary)
-	local primaryChannel = LAYER_CHANNELS[1]
-	if addonTable.activeLayerChannel and addonTable.activeLayerChannel ~= primaryChannel then
-		AutoLayer:Print("Primary channel unavailable, using fallback: " .. addonTable.activeLayerChannel)
-	elseif not addonTable.activeLayerChannel then
-		AutoLayer:Print("All layer channels unavailable")
-	end
-
-	-- Remove all layer channels from chat frames (so they don't clutter the chat)
-	for i = 1, 10 do
-		if _G["ChatFrame" .. i] then
-			for _, ch in ipairs(LAYER_CHANNELS) do
-				ChatFrame_RemoveChannel(_G["ChatFrame" .. i], ch)
+	-- Step 2: After a short delay, check which channels were actually joined
+	C_Timer.After(1, function()
+		-- Check which channels could not be joined and mark them as failed
+		for _, channelName in ipairs(LAYER_CHANNELS) do
+			local channel_num = GetChannelName(channelName)
+			if channel_num == 0 and not failedChannels[channelName] then
+				failedChannels[channelName] = true
+				AutoLayer:DebugPrint("Channel '" .. channelName .. "' marked as failed (could not join)")
 			end
 		end
-	end
+
+		-- Determine which channel to use for sending (priority order matches LAYER_CHANNELS)
+		addonTable.activeLayerChannel = nil
+		for _, channelName in ipairs(LAYER_CHANNELS) do
+			local channel_num = GetChannelName(channelName)
+			if channel_num > 0 then
+				if not addonTable.activeLayerChannel then
+					addonTable.activeLayerChannel = channelName
+					AutoLayer:DebugPrint("Active layer channel set to: " .. channelName)
+				end
+			end
+		end
+
+		-- Inform user if we had to use a fallback (first channel in list is primary)
+		local primaryChannel = LAYER_CHANNELS[1]
+		if addonTable.activeLayerChannel and addonTable.activeLayerChannel ~= primaryChannel then
+			AutoLayer:Print("Primary channel unavailable, using fallback: " .. addonTable.activeLayerChannel)
+		elseif not addonTable.activeLayerChannel then
+			AutoLayer:Print("All layer channels unavailable")
+		end
+
+		-- Remove all layer channels from chat frames (so they don't clutter the chat)
+		for i = 1, 10 do
+			if _G["ChatFrame" .. i] then
+				for _, ch in ipairs(LAYER_CHANNELS) do
+					ChatFrame_RemoveChannel(_G["ChatFrame" .. i], ch)
+				end
+			end
+		end
+	end)
 end
 
 function ProccessQueue()
