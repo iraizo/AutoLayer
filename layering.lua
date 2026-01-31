@@ -6,6 +6,12 @@ local pendingPlayerInvites = {}
 local recentLayerRequests = {}
 local kicked_player_queue = {}
 
+-- Fallback channel system
+local LAYER_CHANNELS = {"layer", "layer2", "layer3"}
+local channelJoinAttempts = {} -- Track join attempts per channel
+local MAX_JOIN_ATTEMPTS = 3
+addonTable.activeLayerChannel = nil
+
 --- @return boolean is_logging_out Whether the current player is logging out
 local function isPlayerLoggingOut()
 	local isLoggingOut = false
@@ -534,15 +540,49 @@ AutoLayer:RegisterEvent("CHAT_MSG_SYSTEM", "ProcessSystemMessages")
 AutoLayer:RegisterEvent("GROUP_ROSTER_UPDATE", "ProcessRosterUpdate")
 
 function JoinLayerChannel()
-	JoinChannelByName("layer")
-	local channel_num = GetChannelName("layer")
-	if channel_num == 0 then
-		print("Failed to join Layer channel")
+	-- Join ALL channels to prevent griefing (so griefers can't become admin in empty channels)
+	-- But only try each channel up to MAX_JOIN_ATTEMPTS times to avoid password popup spam
+	for _, channelName in ipairs(LAYER_CHANNELS) do
+		channelJoinAttempts[channelName] = channelJoinAttempts[channelName] or 0
+		if channelJoinAttempts[channelName] < MAX_JOIN_ATTEMPTS then
+			local channel_num = GetChannelName(channelName)
+			if channel_num == 0 then
+				channelJoinAttempts[channelName] = channelJoinAttempts[channelName] + 1
+				AutoLayer:DebugPrint("Attempting to join '" .. channelName .. "' (attempt " .. channelJoinAttempts[channelName] .. "/" .. MAX_JOIN_ATTEMPTS .. ")")
+				JoinChannelByName(channelName)
+			end
+		end
 	end
 
+	-- Determine which channel to use for sending (priority: layer > layer2 > layer3)
+	addonTable.activeLayerChannel = nil
+	for _, channelName in ipairs(LAYER_CHANNELS) do
+		local channel_num = GetChannelName(channelName)
+		if channel_num > 0 then
+			if not addonTable.activeLayerChannel then
+				addonTable.activeLayerChannel = channelName
+			end
+		else
+			-- Channel unavailable (password protected or max attempts reached)
+			if channelJoinAttempts[channelName] >= MAX_JOIN_ATTEMPTS then
+				AutoLayer:DebugPrint("Channel '" .. channelName .. "' skipped (max attempts reached)")
+			end
+		end
+	end
+
+	-- Inform user if we had to use a fallback
+	if addonTable.activeLayerChannel and addonTable.activeLayerChannel ~= "layer" then
+		AutoLayer:Print("Channel 'layer' unavailable, using fallback: " .. addonTable.activeLayerChannel)
+	elseif not addonTable.activeLayerChannel then
+		AutoLayer:Print("All layer channels unavailable (layer, layer2, layer3)")
+	end
+
+	-- Remove all layer channels from chat frames (so they don't clutter the chat)
 	for i = 1, 10 do
 		if _G["ChatFrame" .. i] then
-			ChatFrame_RemoveChannel(_G["ChatFrame" .. i], "layer")
+			for _, ch in ipairs(LAYER_CHANNELS) do
+				ChatFrame_RemoveChannel(_G["ChatFrame" .. i], ch)
+			end
 		end
 	end
 end
@@ -551,25 +591,35 @@ function ProccessQueue()
 	AutoLayer:HandleAutoKick()
 	if #addonTable.send_queue > 0 then
 		local payload = table.remove(addonTable.send_queue, 1)
-		local l_channel_num = GetChannelName("layer")
-		if l_channel_num == 0 then
-			JoinLayerChannel()
-			do
-				return
+		local sentToAny = false
+
+		-- Send to ALL available layer channels for maximum reach
+		for _, channelName in ipairs(LAYER_CHANNELS) do
+			local channel_num = GetChannelName(channelName)
+			if channel_num > 0 then
+				CTL:SendChatMessage("BULK", channelName, payload, "CHANNEL", nil, channel_num)
+				AutoLayer:DebugPrint("Sent message to channel: " .. channelName)
+				sentToAny = true
 			end
 		end
-		CTL:SendChatMessage("BULK", "layer", payload, "CHANNEL", nil, l_channel_num)
+
+		if not sentToAny then
+			JoinLayerChannel()
+		end
 	end
 end
 
 C_Timer.After(1, function()
 	WorldFrame:HookScript("OnMouseDown", function(self, button)
-		local l_channel_num = GetChannelName("layer")
+		local activeChannel = addonTable.activeLayerChannel
+		if not activeChannel then
+			JoinLayerChannel()
+			return
+		end
+		local l_channel_num = GetChannelName(activeChannel)
 		if l_channel_num == 0 then
 			JoinLayerChannel()
-			do
-				return
-			end
+			return
 		end
 
 		AutoLayer:HandleAutoKick()
