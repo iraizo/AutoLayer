@@ -12,6 +12,22 @@ addonTable.activeLayerChannel = nil
 
 -- Channel list - will be populated after all addons load
 local LAYER_CHANNELS = {}
+local RESERVED_CHANNEL_SLOTS = 7
+
+local function GetFirstOpenChannelSlot()
+	local maxChannels = MAX_WOW_CHAT_CHANNELS or 20
+	for i = 1, maxChannels do
+		local _, channelName = GetChannelName(i)
+		if not channelName or channelName == "" then
+			return i
+		end
+	end
+	return maxChannels + 1
+end
+
+local function IsReservedChannelSlot(channelNum)
+	return channelNum and channelNum > 0 and channelNum <= RESERVED_CHANNEL_SLOTS
+end
 
 -- Generate dynamic channel names based on server date and realm name
 local function GenerateLayerChannels()
@@ -620,6 +636,14 @@ function JoinLayerChannel()
 	-- Join ALL channels to prevent griefing (so griefers can't become admin in empty channels)
 	-- Only try each channel once - if it fails (e.g. password protected), don't retry
 
+	local firstOpenSlot = GetFirstOpenChannelSlot()
+	if firstOpenSlot <= RESERVED_CHANNEL_SLOTS then
+		AutoLayer:DebugPrint(
+			"Open chat slot " .. firstOpenSlot .. " is reserved (1-4). Delaying layer channel join."
+		)
+		return
+	end
+
 	-- Step 1: Attempt to join all channels that are not marked as failed
 	for _, channelName in ipairs(LAYER_CHANNELS) do
 		if not failedChannels[channelName] then
@@ -636,9 +660,18 @@ function JoinLayerChannel()
 	-- Step 2: After a short delay, check which channels were actually joined
 	C_Timer.After(1, function()
 		-- Check which channels could not be joined and mark them as failed
+		local reservedSlotRetry = {}
 		for _, channelName in ipairs(LAYER_CHANNELS) do
 			local channel_num = GetChannelName(channelName)
-			if channel_num == 0 and not failedChannels[channelName] then
+			if IsReservedChannelSlot(channel_num) then
+				AutoLayer:DebugPrint(
+					"Channel '" .. channelName .. "' landed in reserved slot " .. channel_num .. "; leaving"
+				)
+				LeaveChannelByName(channelName)
+				reservedSlotRetry[channelName] = true
+				channel_num = 0
+			end
+			if channel_num == 0 and not failedChannels[channelName] and not reservedSlotRetry[channelName] then
 				failedChannels[channelName] = true
 				AutoLayer:DebugPrint("Channel '" .. channelName .. "' marked as failed (could not join)")
 			end
@@ -648,7 +681,7 @@ function JoinLayerChannel()
 		addonTable.activeLayerChannel = nil
 		for _, channelName in ipairs(LAYER_CHANNELS) do
 			local channel_num = GetChannelName(channelName)
-			if channel_num > 0 then
+			if channel_num > RESERVED_CHANNEL_SLOTS then
 				if not addonTable.activeLayerChannel then
 					addonTable.activeLayerChannel = channelName
 					AutoLayer:DebugPrint("Active layer channel set to: " .. channelName)
@@ -684,7 +717,7 @@ function ProccessQueue()
 		-- Send to ALL available layer channels for maximum reach
 		for _, channelName in ipairs(LAYER_CHANNELS) do
 			local channel_num = GetChannelName(channelName)
-			if channel_num > 0 then
+			if channel_num > RESERVED_CHANNEL_SLOTS then
 				CTL:SendChatMessage("BULK", channelName, payload, "CHANNEL", nil, channel_num)
 				AutoLayer:DebugPrint("Sent message to channel: " .. channelName)
 				sentToAny = true
@@ -705,7 +738,7 @@ C_Timer.After(1, function()
 			return
 		end
 		local l_channel_num = GetChannelName(activeChannel)
-		if l_channel_num == 0 then
+			if l_channel_num == 0 or IsReservedChannelSlot(l_channel_num) then
 			JoinLayerChannel()
 			return
 		end
