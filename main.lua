@@ -332,9 +332,9 @@ local options = {
 					name = "Loot Threshold (for Group Loot)",
 					desc = "Select the loot threshold to set when using group loot method.",
 					values = {
-						[2] = "Uncommon",
-						[3] = "Rare",
-						[4] = "Epic",
+						[2] = "|cff1EFF00Uncommon|r",
+						[3] = "|cff0070DDRare|r",
+						[4] = "|cffA335EEEpic|r",
 					},
 					set = function(info, val)
 						AutoLayer.db.profile.lootThreshold = val
