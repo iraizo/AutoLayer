@@ -510,14 +510,18 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 			end
 		end
 		-- Ensure group loot is set as desired
-		local lootMethod, _, _ = C_PartyInfo.GetLootMethod()
-		if self.db.profile.overrideLootSettings and lootMethod ~= self.db.profile.lootMethod then
-			self:DebugPrint("Setting loot method to", self.db.profile.lootMethod)
-			C_PartyInfo.SetLootMethod(self.db.profile.lootMethod)
-		end
-		if self.db.profile.overrideLootSettings and self.db.profile.lootMethod == 3 and GetLootThreshold() ~= self.db.profile.lootThreshold then
-			self:DebugPrint("Setting loot threshold to", self.db.profile.lootThreshold)
-			SetLootThreshold(self.db.profile.lootThreshold)
+		if self.db.profile.overrideLootSettings and UnitIsGroupLeader("player") then
+			local lootMethod, _, _ = C_PartyInfo.GetLootMethod()
+
+			if lootMethod ~= self.db.profile.lootMethod then
+				self:DebugPrint("Setting loot method to", self.db.profile.lootMethod)
+				C_PartyInfo.SetLootMethod(self.db.profile.lootMethod)
+			end
+
+			if self.db.profile.lootMethod == 3 and GetLootThreshold() ~= self.db.profile.lootThreshold then
+				self:DebugPrint("Setting loot threshold to", self.db.profile.lootThreshold)
+				SetLootThreshold(self.db.profile.lootThreshold)
+			end
 		end
 	end
 
