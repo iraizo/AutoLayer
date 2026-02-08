@@ -509,6 +509,20 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 				break -- Found the player, no need to continue checking
 			end
 		end
+		-- Ensure group loot is set as desired
+		if self.db.profile.overrideLootSettings and UnitIsGroupLeader("player") then
+			local lootMethod, _, _ = C_PartyInfo.GetLootMethod()
+
+			if lootMethod ~= self.db.profile.lootMethod then
+				self:DebugPrint("Setting loot method to", self.db.profile.lootMethod)
+				C_PartyInfo.SetLootMethod(self.db.profile.lootMethod)
+			end
+
+			if self.db.profile.lootMethod == 3 and GetLootThreshold() ~= self.db.profile.lootThreshold then
+				self:DebugPrint("Setting loot threshold to", self.db.profile.lootThreshold)
+				SetLootThreshold(self.db.profile.lootThreshold)
+			end
+		end
 	end
 
 	characterName = SystemMessages:match("^" .. ERR_DECLINE_GROUP_S:format("(.+)"))
