@@ -602,7 +602,7 @@ function AutoLayer:HandleAutoKick()
 		end
 
 		self:DebugPrint("Kicking ", name)
-		C_PartyInfo.UninviteUnit(name)
+		UninviteUnit(name)
 	end
 end
 
