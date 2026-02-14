@@ -2,7 +2,7 @@
 ## Title: AutoLayer
 ## Notes: Automatically invites people that want to layer switch
 ## Author: raizo
-## Version: 1.7.4
+## Version: 1.7.6
 ## SavedVariables: AutoLayerDB
 
 embeds.xml
