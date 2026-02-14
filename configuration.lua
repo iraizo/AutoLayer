@@ -9,11 +9,6 @@ function AutoLayer:GetDebug(info)
 	return self.db.profile.debug
 end
 
-function AutoLayer:SetEnabled(info, val)
-	AutoLayer:DebugPrint("SetEnabled", info, val)
-	self.db.profile.enabled = val
-end
-
 function AutoLayer:GetEnabled(info)
 	return self.db.profile.enabled
 end
@@ -94,6 +89,9 @@ function AutoLayer:Toggle()
 		if self.db.profile.hideSystemGroupMessages then
 			self:filterChatEventSystemGroupMessages()
 		end
+		if self.db.profile.mutesounds then
+			self:MuteAnnoyingSounds()
+		end
 
 		addonTable.bunnyLDB.icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_enabled_icon]]
 	else
@@ -102,6 +100,9 @@ function AutoLayer:Toggle()
 		end
 		if self.db.profile.hideSystemGroupMessages then
 			self:unfilterChatEventSystemGroupMessages()
+		end
+		if self.db.profile.mutesounds then
+			self:UnmuteAnnoyingSounds()
 		end
 
 		addonTable.bunnyLDB.icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_disabled_icon]]
