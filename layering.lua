@@ -137,6 +137,16 @@ local function removeRealmName(name)
 	return ({ strsplit("-", name) })[1]
 end
 
+local function stripColorCodes(msg)
+	if not msg then
+		return msg
+	end
+	-- Remove WoW color codes so addon prefixes like "[NWB]" still match reliably
+	msg = msg:gsub("|c%x%x%x%x%x%x%x%x", "")
+	msg = msg:gsub("|r", "")
+	return msg
+end
+
 --- Checks if a message contains any word from a given list, with an option to respect word boundaries.
 --- @param msg string The message to search through.
 --- @param listOfWords table<string> A list of words to search for in the message.
@@ -302,18 +312,25 @@ function AutoLayer:ProcessMessage(
 	channelIndex,
 	channelBaseName
 )
-
-    -- Ignore Nova World Buffs auto announcements
-    if msg and msg:match("^%[NWB%]") then
-        return
-    end
-
 	if not self.db.profile.enabled or isPlayerLoggingOut() then
 		return
 	end
 
 	if event ~= "CHAT_MSG_GUILD" and self.db.profile.guildOnly then
 		return
+	end
+
+	-- Ignore messages that start with configured prefixes (e.g. addon announcements like "[NWB]")
+	do
+		local prefixes = (self.ParseIgnorePrefixes and self:ParseIgnorePrefixes()) or {}
+		if prefixes and #prefixes > 0 and msg then
+			local cleanMsg = string.lower(stripColorCodes(msg))
+			for _, prefix in ipairs(prefixes) do
+				if prefix ~= "" and cleanMsg:sub(1, #prefix) == prefix then
+					return
+				end
+			end
+		end
 	end
 
 	local name_without_realm = removeRealmName(name)
