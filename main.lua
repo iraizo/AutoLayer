@@ -38,7 +38,7 @@ local options = {
 					type = "toggle",
 					name = "Enabled",
 					desc = "Enable or disable AutoLayer.",
-					set = "SetEnabled",
+					set = "Toggle",
 					get = "GetEnabled",
 					order = 1,
 				},
@@ -480,7 +480,7 @@ function AutoLayer:OnInitialize()
 		icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_disabled_icon]]
 	end
 
-	if self.db.profile.mutesounds then
+	if self.db.profile.enabled and self.db.profile.mutesounds then
 		self:MuteAnnoyingSounds()
 	end
 
