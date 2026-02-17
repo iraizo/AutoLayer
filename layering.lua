@@ -383,9 +383,21 @@ function AutoLayer:ProcessMessage(
 		"'"
 	)
 
-	if self.db.profile.turnOffWhileRaidAssist and IsInRaid() and UnitIsGroupAssistant("player") then
-		self:DebugPrint("Ignoring request because we are raid assist!")
-		return
+	-- Check if player has permission to invite (leader for party, leader or assist for raid)
+	if (IsInGroup() or IsInRaid()) then
+		local isLeader = UnitIsGroupLeader("player")
+		local isRaidAssist = IsInRaid() and UnitIsGroupAssistant("player")
+		local turnOffForAssist = self.db.profile.turnOffWhileRaidAssist and isRaidAssist
+		
+		if turnOffForAssist then
+			self:DebugPrint("Ignoring request because we are raid assist and turnOffWhileRaidAssist is enabled!")
+			return
+		end
+		
+		if not isLeader and not isRaidAssist then
+			self:DebugPrint("Ignoring request because we are not the group leader or raid assist!")
+			return
+		end
 	end
 
 	local currentLayer = AutoLayer:getCurrentLayer()
