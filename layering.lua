@@ -302,6 +302,12 @@ function AutoLayer:ProcessMessage(
 	channelIndex,
 	channelBaseName
 )
+
+    -- Ignore Nova World Buffs auto announcements
+    if msg and msg:match("^%[NWB%]") then
+        return
+    end
+
 	if not self.db.profile.enabled or isPlayerLoggingOut() then
 		return
 	end
