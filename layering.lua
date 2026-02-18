@@ -1,4 +1,80 @@
+-- TBC-only: locale-proof layer pool detection (mapID based)
+function AutoLayer:GetLayerPoolKey()
+    if C_Map and C_Map.GetBestMapForUnit then
+        local mapID = C_Map.GetBestMapForUnit("player")
+        if mapID then
+            local mi = C_Map.GetMapInfo(mapID)
+
+            while mi and mi.parentMapID and mi.parentMapID ~= 0 do
+                if mi.parentMapID == 1945 then -- Outland continent mapID
+                    return "OUTLAND"
+                end
+                mi = C_Map.GetMapInfo(mi.parentMapID)
+            end
+
+            if mi and mi.mapID == 1945 then
+                return "OUTLAND"
+            end
+        end
+    end
+    return "AZEROTH"
+end
+
+
 local addonName, addonTable = ...
+
+-- Pool metadata via addon messages (TBC)
+local AL_POOL_PREFIX = "ALP" -- short, unlikely to collide
+local AL_POOL_TTL = 3        -- seconds to keep metadata
+
+local _alPoolMetaBySender = {} -- name_without_realm -> { pool="AZEROTH"/"OUTLAND", ts=time() }
+
+local function _AL_Now()
+    return time()
+end
+
+local function _AL_Prune()
+    local now = _AL_Now()
+    for k,v in pairs(_alPoolMetaBySender) do
+        if not v or not v.ts or (now - v.ts) > AL_POOL_TTL then
+            _alPoolMetaBySender[k] = nil
+        end
+    end
+end
+
+-- Listen for pool metadata addon messages
+do
+    local f = CreateFrame("Frame")
+    f:RegisterEvent("CHAT_MSG_ADDON")
+    f:SetScript("OnEvent", function(_, event, prefix, msg, channel, sender)
+        if prefix ~= AL_POOL_PREFIX then return end
+        if not sender or sender == "" then return end
+
+        -- sender may include realm; normalize the same way as ProcessMessage does
+        local name_without_realm = sender
+        if name_without_realm and string.find(name_without_realm, "-") then
+            name_without_realm = string.match(name_without_realm, "^(.-)%-%s*.*$") or name_without_realm
+        end
+
+        if not name_without_realm or name_without_realm == "" then return end
+
+        -- payload: "POOL|AZEROTH" or "POOL|OUTLAND"
+        local kind, pool = string.match(msg or "", "^(%w+)%|(%w+)$")
+        if kind == "POOL" and (pool == "AZEROTH" or pool == "OUTLAND") then
+            _alPoolMetaBySender[name_without_realm] = { pool = pool, ts = _AL_Now() }
+        end
+
+        _AL_Prune()
+    end)
+
+    if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
+        C_ChatInfo.RegisterAddonMessagePrefix(AL_POOL_PREFIX)
+    elseif RegisterAddonMessagePrefix then
+        RegisterAddonMessagePrefix(AL_POOL_PREFIX)
+    end
+end
+
+
 local CTL = _G.ChatThrottleLib
 
 local playersInvitedRecently = {}
@@ -356,6 +432,20 @@ function AutoLayer:ProcessMessage(
 		)
 		return
 	end
+
+-- Pool enforcement (uses hidden addon metadata)
+_AL_Prune()
+local meta = _alPoolMetaBySender[name_without_realm]
+if meta and meta.pool then
+    local myPool = self:GetLayerPoolKey()
+    if meta.pool ~= myPool then
+        if self.Print then
+            self:Print("Ignored layer request due to pool mismatch: " .. tostring(meta.pool) .. " vs " .. tostring(myPool))
+        end
+        return
+    end
+end
+
 
 	if self.db.profile.channelFiltering == "inclusive" then
 		local inclusiveChannelMatch = containsAnyChannelFromList(channelBaseName, AutoLayer:ParseFilteredChannels())

@@ -11,6 +11,13 @@ local is_closed = true
 function AutoLayer:SendLayerRequest()
 	local res = "inv layer "
 	res = res .. table.concat(selected_layers, ",")
+	-- Send hidden pool metadata for pool-aware clients
+	local pool = self.GetLayerPoolKey and self:GetLayerPoolKey() or "AZEROTH"
+	if C_ChatInfo and C_ChatInfo.SendAddonMessage then
+		C_ChatInfo.SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", addonTable.channel_name or "layer")
+	elseif SendAddonMessage then
+		SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", addonTable.channel_name or "layer")
+	end
 	LeaveParty()
 	table.insert(addonTable.send_queue, res)
 	AutoLayer:DebugPrint("Sending layer request: " .. res)
