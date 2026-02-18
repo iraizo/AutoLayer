@@ -205,6 +205,15 @@ local options = {
 					end,
 					order = 9,
 				},
+				ignorePrefixes = {
+                    type = "input",
+                    name = "Ignored Prefixes",
+                    desc = "Comma-separated message prefixes to ignore (match only at the start). Example: [NWB]",
+                    set = "SetIgnorePrefixes",
+                    get = "GetIgnorePrefixes",
+                    width = 1,
+                    order = 10,
+                },
 			},
 		},
 
@@ -354,6 +363,7 @@ local defaults = {
 		enabled = true,
 		debug = false,
 		triggers = "layer",
+		ignorePrefixes = "[NWB]",
 		blacklist = "wts,wtb,lfm,lfg,ashen,auto inv,autoinv,pst for,guild,raid,enchant,player,what layer,which layer,WorldBuffs",
 		invertKeywords = "not,off,except,but,out,other than,besides,apart from",
 		channelFiltering = "none",
