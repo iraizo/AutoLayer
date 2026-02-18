@@ -77,7 +77,7 @@ local options = {
 					get = function(info)
 						return AutoLayer.db.profile.guildOnly
 					end,
-					order = 4,
+					order = 5,
 				},
 			},
 		},
@@ -96,13 +96,21 @@ local options = {
 					get = "GetTriggers",
 					order = 1,
 				},
+				ignorePrefixes = {
+					type = "input",
+					name = "Ignored Prefixes",
+					desc = "Comma-separated message prefixes to ignore (match only at the start). Example: [NWB]",
+					set = "SetIgnorePrefixes",
+					get = "GetIgnorePrefixes",
+					order = 2,
+				},
 				blacklist = {
 					type = "input",
 					name = "Blacklist",
 					desc = "Comma-separated words to ignore messages containing them.",
 					set = "SetBlacklist",
 					get = "GetBlacklist",
-					order = 2,
+					order = 3,
 				},
 				invertKeywords = {
 					type = "input",
@@ -110,7 +118,7 @@ local options = {
 					desc = "Comma-separated words to exclude specific layers.",
 					set = "SetInvertKeywords",
 					get = "GetInvertKeywords",
-					order = 3,
+					order = 4,
 				},
 				channelFiltering = {
 					type = "select",
@@ -354,6 +362,7 @@ local defaults = {
 		enabled = true,
 		debug = false,
 		triggers = "layer",
+		ignorePrefixes = "[NWB]",
 		blacklist = "wts,wtb,lfm,lfg,ashen,auto inv,autoinv,pst for,guild,raid,enchant,player,what layer,which layer,WorldBuffs",
 		invertKeywords = "not,off,except,but,out,other than,besides,apart from",
 		channelFiltering = "none",
