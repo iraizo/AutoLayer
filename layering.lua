@@ -62,6 +62,7 @@ do
         local kind, pool = string.match(msg or "", "^(%w+)%|(%w+)$")
         if kind == "POOL" and (pool == "AZEROTH" or pool == "OUTLAND") then
             _alPoolMetaBySender[name_without_realm] = { pool = pool, ts = _AL_Now() }
+			AutoLayer:DebugPrint("[POOL_META_RECV]", "sender=", tostring(name_without_realm), "pool=", tostring(pool), "rawSender=", tostring(sender))
         end
 
         _AL_Prune()
@@ -436,14 +437,16 @@ function AutoLayer:ProcessMessage(
 -- Pool enforcement (uses hidden addon metadata)
 _AL_Prune()
 local meta = _alPoolMetaBySender[name_without_realm]
+	if not meta then
+		self:DebugPrint("[POOL_ENFORCE]", "sender=", tostring(name_without_realm), "no metadata (legacy sender)")
+	end
 if meta and meta.pool then
     local myPool = self:GetLayerPoolKey()
     if meta.pool ~= myPool then
-        if self.Print then
-            self:Print("Ignored layer request due to pool mismatch: " .. tostring(meta.pool) .. " vs " .. tostring(myPool))
-        end
+        self:DebugPrint("[POOL_ENFORCE]", "sender=", tostring(name_without_realm), "senderPool=", tostring(meta.pool), "myPool=", tostring(myPool), "decision=IGNORE")
         return
     end
+		self:DebugPrint("[POOL_ENFORCE]", "sender=", tostring(name_without_realm), "senderPool=", tostring(meta.pool), "myPool=", tostring(myPool), "decision=ALLOW")
 end
 
 

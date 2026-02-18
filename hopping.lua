@@ -18,6 +18,7 @@ function AutoLayer:SendLayerRequest()
 	elseif SendAddonMessage then
 		SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", addonTable.channel_name or "layer")
 	end
+	self:DebugPrint("[POOL_META_SEND]", "pool=", pool, "channel=", tostring(addonTable.channel_name or "layer"))
 	LeaveParty()
 	table.insert(addonTable.send_queue, res)
 	AutoLayer:DebugPrint("Sending layer request: " .. res)
