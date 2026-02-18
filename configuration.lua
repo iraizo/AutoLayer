@@ -22,12 +22,33 @@ function AutoLayer:GetTriggers(info)
 	return self.db.profile.triggers
 end
 
+function AutoLayer:SetIgnorePrefixes(info, val)
+	AutoLayer:DebugPrint("SetIgnorePrefixes", info, val)
+	self.db.profile.ignorePrefixes = val
+end
+
+function AutoLayer:GetIgnorePrefixes(info)
+	return self.db.profile.ignorePrefixes
+end
+
 function AutoLayer:ParseTriggers()
 	local triggers = {}
 	for trigger in string.gmatch(self.db.profile.triggers, "[^,]+") do
 		table.insert(triggers, string.lower("*" .. trigger .. "*"))
 	end
 	return triggers
+end
+
+function AutoLayer:ParseIgnorePrefixes()
+	local prefixes = {}
+	local raw = self.db.profile.ignorePrefixes or ""
+	for prefix in string.gmatch(raw, "[^,]+") do
+		local trimmed = string.match(prefix, "^%s*(.-)%s*$")
+		if trimmed ~= "" then
+			table.insert(prefixes, string.lower(trimmed))
+		end
+	end
+	return prefixes
 end
 
 function AutoLayer:SetBlacklist(info, val)
