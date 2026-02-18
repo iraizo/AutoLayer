@@ -96,21 +96,13 @@ local options = {
 					get = "GetTriggers",
 					order = 1,
 				},
-				ignorePrefixes = {
-					type = "input",
-					name = "Ignored Prefixes",
-					desc = "Comma-separated message prefixes to ignore (match only at the start). Example: [NWB]",
-					set = "SetIgnorePrefixes",
-					get = "GetIgnorePrefixes",
-					order = 2,
-				},
 				blacklist = {
 					type = "input",
 					name = "Blacklist",
 					desc = "Comma-separated words to ignore messages containing them.",
 					set = "SetBlacklist",
 					get = "GetBlacklist",
-					order = 3,
+					order = 2,
 				},
 				invertKeywords = {
 					type = "input",
@@ -118,8 +110,17 @@ local options = {
 					desc = "Comma-separated words to exclude specific layers.",
 					set = "SetInvertKeywords",
 					get = "GetInvertKeywords",
-					order = 4,
+					order = 3,
 				},
+                ignorePrefixes = {
+                    type = "input",
+                    name = "Ignored Prefixes",
+                    desc = "Comma-separated message prefixes to ignore (match only at the start). Example: [NWB]",
+                    set = "SetIgnorePrefixes",
+                    get = "GetIgnorePrefixes",
+                    width = 0.6,
+                    order = 4,
+                },
 				channelFiltering = {
 					type = "select",
 					width = 1.2,
@@ -136,7 +137,7 @@ local options = {
 					get = function(info)
 						return AutoLayer.db.profile.channelFiltering
 					end,
-					order = 4,
+					order = 5,
 				},
 				filteredChannels = {
 					type = "input",
@@ -155,7 +156,7 @@ local options = {
 					disabled = function()
 						return AutoLayer.db.profile.channelFiltering == "none"
 					end,
-					order = 5,
+					order = 6,
 				},
 				inviteWhisper = {
 					type = "toggle",
@@ -167,7 +168,7 @@ local options = {
 					get = function(info)
 						return AutoLayer.db.profile.inviteWhisper
 					end,
-					order = 6,
+					order = 7,
 				},
 				inviteWhisperTemplate = {
 					type = "input",
@@ -183,7 +184,7 @@ local options = {
 					validate = function(info, val)
 						return checkTemplateLength(val)
 					end,
-					order = 7,
+					order = 8,
 				},
 				inviteWhisperReminder = {
 					type = "toggle",
@@ -195,7 +196,7 @@ local options = {
 					get = function(info)
 						return AutoLayer.db.profile.inviteWhisperReminder
 					end,
-					order = 8,
+					order = 9,
 				},
 				inviteWhisperTemplateReminder = {
 					type = "input",
@@ -211,7 +212,7 @@ local options = {
 					validate = function(info, val)
 						return checkTemplateLength(val)
 					end,
-					order = 9,
+					order = 10,
 				},
 			},
 		},
