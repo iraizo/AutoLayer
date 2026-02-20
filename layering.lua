@@ -586,10 +586,19 @@ function AutoLayer:ProcessMessage(
 	---@diagnostic disable-next-line: undefined-global
 	if (GetNumGroupMembers() + #pendingPlayerInvites) <= max_group_size then
 		self:DebugPrint("Group has room (", GetNumGroupMembers(), "in group +", #pendingPlayerInvites, "pending invites). Inviting", name_without_realm, "to layer", currentLayer)
-		if not isHighPriorityRequest and (not self.db.profile.inviteWhisper or not currentLayer or currentLayer <= 0) then
-			self:DebugPrint(
-				"Auto-whisper is turned off or we can't provide a helpful whisper, delaying our invite by 500 miliseconds"
-			)
+		if not isHighPriorityRequest and not self.db.profile.inviteWhisper then
+			-- Whisper is off: delay the invite slightly so it doesn't appear instant/spammy
+			self:DebugPrint("Auto-whisper is turned off, delaying invite by 500 milliseconds")
+			C_Timer.After(0.5, function()
+				if isSeasonal then
+					C_PartyInfo.InviteUnit(name_without_realm)
+				else
+					C_PartyInfo.InviteUnit(name)
+				end
+			end)
+		elseif not isHighPriorityRequest and (not currentLayer or currentLayer <= 0) then
+			-- Whisper is on but we don't know our layer yet, so we can't send a useful whisper; delay invite
+			self:DebugPrint("Auto-whisper is on but current layer is unknown, delaying invite by 500 milliseconds")
 			C_Timer.After(0.5, function()
 				if isSeasonal then
 					C_PartyInfo.InviteUnit(name_without_realm)
