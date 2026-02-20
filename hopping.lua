@@ -11,18 +11,23 @@ local is_closed = true
 function AutoLayer:SendLayerRequest()
 	local res = "inv layer "
 	res = res .. table.concat(selected_layers, ",")
-	-- Send hidden pool metadata for pool-aware clients
+	-- Send hidden pool metadata to all active layer channels so recipients can enforce pool filtering
 	local pool = self.GetLayerPoolKey and self:GetLayerPoolKey() or "AZEROTH"
-	if C_ChatInfo and C_ChatInfo.SendAddonMessage then
-		C_ChatInfo.SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", addonTable.channel_name or "layer")
-	elseif SendAddonMessage then
-		SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", addonTable.channel_name or "layer")
+	for _, channelName in ipairs(LAYER_CHANNELS or {}) do
+		local channel_num = GetChannelName(channelName)
+		if channel_num and channel_num > 0 then
+			if C_ChatInfo and C_ChatInfo.SendAddonMessage then
+				C_ChatInfo.SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", channel_num)
+			elseif SendAddonMessage then
+				SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", channel_num)
+			end
+		end
 	end
-	self:DebugPrint("[POOL_META_SEND]", "pool=", pool, "channel=", tostring(addonTable.channel_name or "layer"))
+	self:DebugPrint("[POOL_META_SEND]", "pool=", pool)
 	LeaveParty()
 	table.insert(addonTable.send_queue, res)
 	AutoLayer:DebugPrint("Sending layer request: " .. res)
-	ProccessQueue()
+	ProcessQueue()
 end
 
 function AutoLayer:SlashCommandRequest(input)
@@ -82,6 +87,7 @@ function AutoLayer:HopGUI()
 	frame:SetCallback("OnClose", function()
 		is_closed = true
 		selected_layers = {}
+		sessionID = {} -- invalidate any running UpdateLayerText timer loops
 	end)
 
 	-- Create send button
@@ -188,9 +194,10 @@ function AutoLayer:HopGUI()
 		end
 
 		local lastKnownLayer = nil
+		local sessionID = {} -- unique table reference per GUI open; used to cancel stale timer loops
 		local function UpdateLayerText() -- while UI open, constantly monitors changes to 'NWB_CurrentLayer' and updates UI
 			if is_closed then
-				return
+				return -- session ended, stop the loop
 			end
 
 			local currentLayer = NWB_CurrentLayer
@@ -217,7 +224,11 @@ function AutoLayer:HopGUI()
 				lastKnownLayer = currentLayer
 			end
 
-			C_Timer.After(0.5, UpdateLayerText)
+			local capturedSession = sessionID
+			C_Timer.After(0.5, function()
+				if capturedSession ~= sessionID then return end -- stale session, discard
+				UpdateLayerText()
+			end)
 		end
 		UpdateLayerText()
 
