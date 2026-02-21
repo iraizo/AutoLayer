@@ -494,7 +494,7 @@ function AutoLayer:OnInitialize()
 	end
 
 	if self.db.profile.hideAutoWhispers then
-		self.filterChatEventAutoLayerWhisperMessages()
+		self:filterChatEventAutoLayerWhisperMessages()
 	end
 
 	if self.db.profile.hideSystemGroupMessages then

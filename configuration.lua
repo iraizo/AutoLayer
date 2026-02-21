@@ -91,7 +91,7 @@ end
 
 function AutoLayer:ParseFilteredChannels()
 	local filteredChannels = {}
-	for channel in string.gmatch(self.db.profile.filteredChannels, "[^,]+") do
+	for channel in string.gmatch(self.db.profile.filteredChannels or "", "[^,]+") do
 		table.insert(filteredChannels, string.lower(channel))
 	end
 	return filteredChannels
@@ -103,7 +103,7 @@ function AutoLayer:Toggle()
 
 	if self.db.profile.enabled then
 		if self.db.profile.hideAutoWhispers then
-			self.filterChatEventAutoLayerWhisperMessages()
+			self:filterChatEventAutoLayerWhisperMessages()
 		end
 		if self.db.profile.hideSystemGroupMessages then
 			self:filterChatEventSystemGroupMessages()
@@ -115,7 +115,7 @@ function AutoLayer:Toggle()
 		addonTable.bunnyLDB.icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_enabled_icon]]
 	else
 		if self.db.profile.hideAutoWhispers then
-			self.unfilterChatEventAutoLayerWhisperMessages()
+			self:unfilterChatEventAutoLayerWhisperMessages()
 		end
 		if self.db.profile.hideSystemGroupMessages then
 			self:unfilterChatEventSystemGroupMessages()
