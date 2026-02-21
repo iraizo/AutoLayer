@@ -382,6 +382,25 @@ C_Timer.After(0.1, function()
 	CleanupOldLayerChannels()
 end)
 
+local function enqueueKickTarget(name)
+	if not name then
+		return
+	end
+	for _, queuedName in ipairs(kicked_player_queue) do
+		if queuedName == name then
+			return
+		end
+	end
+	table.insert(kicked_player_queue, name)
+end
+
+local function GetCurrentGroupSizeExcludingSelf()
+	if IsInRaid() then
+		return math.max(0, GetNumGroupMembers() - 1)
+	end
+	return GetNumSubgroupMembers()
+end
+
 function AutoLayer:FindOfflineMembersToKick()
 	if IsInRaid() then
 		for i = 1, GetNumGroupMembers() do
@@ -404,25 +423,6 @@ function AutoLayer:FindOfflineMembersToKick()
 			end
 		end
 	end
-end
-
-local function GetCurrentGroupSizeExcludingSelf()
-	if IsInRaid() then
-		return math.max(0, GetNumGroupMembers() - 1)
-	end
-	return GetNumSubgroupMembers()
-end
-
-local function enqueueKickTarget(name)
-	if not name then
-		return
-	end
-	for _, queuedName in ipairs(kicked_player_queue) do
-		if queuedName == name then
-			return
-		end
-	end
-	table.insert(kicked_player_queue, name)
 end
 
 ---@diagnostic disable-next-line:inject-field
@@ -617,7 +617,6 @@ function AutoLayer:ProcessMessage(
 	-- where we have to invite with the realm name
 	-- since those do not exist on anniversary servers and where HasActiveSeason() is true
 	-- we can validate it like this for now.
-	local isSeasonal = C_Seasons.HasActiveSeason()
 	local isSeasonal = C_Seasons and C_Seasons.HasActiveSeason and C_Seasons.HasActiveSeason() or false
 
 	---@diagnostic disable-next-line: undefined-global
@@ -810,7 +809,24 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 
 		if self.db.profile.inviteWhisperReminder then
 			local currentLayerForReminder = AutoLayer:getCurrentLayer()
-			local finalMessage2 = "[AutoLayer] " .. formatWhisperMessage(self.db.profile.inviteWhisperTemplateReminder, currentLayerForReminder or 0)
+			if currentLayerForReminder == nil or currentLayerForReminder <= 0 then
+				self:DebugPrint("Not sending reminder whisper since we don't know what layer we're in!")
+				return
+			end
+
+			local isPlayerInvitedForReminder = false
+			for _, entry in ipairs(recentLayerRequests) do
+				if entry.name == playerNameWithoutRealm then
+					isPlayerInvitedForReminder = true
+					break
+				end
+			end
+
+			if not isPlayerInvitedForReminder then
+				return
+			end
+
+			local finalMessage2 = "[AutoLayer] " .. formatWhisperMessage(self.db.profile.inviteWhisperTemplateReminder, currentLayerForReminder)
 			CTL:SendChatMessage("NORMAL", characterName, finalMessage2, "WHISPER", nil, characterName)
 		end
 	end

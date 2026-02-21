@@ -88,9 +88,10 @@ function AutoLayer:SlashCommandRequest(input)
 		self:DebugPrint("Received slash command request for all layers except current ( layer", NWB_CurrentLayer, ").")
 
 		local count = 0
+		local currentLayerNum = tonumber(NWB_CurrentLayer)
 		for _ in pairs(addonTable.NWB.data.layers) do
 			count = count + 1
-			if count ~= NWB_CurrentLayer then
+			if count ~= currentLayerNum then
 				table.insert(selected_layers, tostring(count))
 			end
 		end

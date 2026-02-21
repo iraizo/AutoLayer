@@ -428,7 +428,7 @@ local annoyingSounds = {
 	542828, -- TaurenFemale_CantInvite
 	542912, -- TaurenMale_CantInvite
 	543102, -- TrollFemale_CantInvite
-	542912, -- TrollMale_CantInvite
+	-- TODO: 542912 here is a duplicate of TaurenMale_CantInvite (copy-paste error). Verify and replace with the correct TrollMale_CantInvite sound ID.
 }
 
 local systemMessages = {
@@ -519,10 +519,6 @@ function AutoLayer:OnInitialize()
 			end
 		end,
 
-		onMouseUp = function(self, button)
-			print(button)
-			AutoLayer:Toggle()
-		end,
 		OnTooltipShow = function(tooltip)
 			tooltip:AddLine("AutoLayer")
 			tooltip:AddLine("Left-click to toggle AutoLayer")
