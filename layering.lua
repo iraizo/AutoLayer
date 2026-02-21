@@ -360,7 +360,7 @@ function AutoLayer:getCurrentLayer()
 		return
 	end -- No NWB, nothing to do here
 
-	if NWB_CurrentLayer == nil or tonumber(NWB_CurrentLayer) == nil or NWB_CurrentLayer <= 0 then
+	if NWB_CurrentLayer == nil or tonumber(NWB_CurrentLayer) == nil or tonumber(NWB_CurrentLayer) <= 0 then
 		return 0
 	end
 	return tonumber(NWB_CurrentLayer)
