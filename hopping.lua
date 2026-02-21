@@ -87,6 +87,11 @@ function AutoLayer:SlashCommandRequest(input)
 	else
 		self:DebugPrint("Received slash command request for all layers except current ( layer", NWB_CurrentLayer, ").")
 
+		if addonTable.NWB == nil then
+			self:Print("Cannot auto-select layers: NovaWorldBuffs is not installed. Specify layers manually, e.g. /autolayer req 1,2,3")
+			return
+		end
+
 		local count = 0
 		local currentLayerNum = tonumber(NWB_CurrentLayer)
 		for _ in pairs(addonTable.NWB.data.layers) do
@@ -185,12 +190,12 @@ function AutoLayer:HopGUI()
 			table.insert(layers, tostring(count))
 		end
 
-		-- Set previously selected values
-		for _, selected_layer in ipairs(selected_layers) do
-			layer:SetValue(selected_layer)
-		end
-
 		layer:SetList(layers)
+
+		-- Restore previously selected values (must be after SetList, which resets item state)
+		for _, selected_layer in ipairs(selected_layers) do
+			layer:SetItemValue(selected_layer, true)
+		end
 
 		local function OnValueChanged(_, _, v, checked)
 			local found = false
@@ -217,7 +222,7 @@ function AutoLayer:HopGUI()
 
 		layer:SetCallback("OnValueChanged", OnValueChanged)
 
-		local currentLayer = NWB_CurrentLayer
+		local currentLayer = tonumber(NWB_CurrentLayer)
 
 		if currentLayer and currentLayer > 0 then
 			-- autoselect all layers except the layer we're currently on
@@ -236,7 +241,7 @@ function AutoLayer:HopGUI()
 				return -- session ended, stop the loop
 			end
 
-			local currentLayer = NWB_CurrentLayer
+			local currentLayer = tonumber(NWB_CurrentLayer)
 
 			-- If the GUI was opened before we knew our layer, auto-select once the layer becomes known.
 			-- This prevents the Send button from staying disabled until the window is reopened.
@@ -251,13 +256,15 @@ function AutoLayer:HopGUI()
 
 			if currentLayer and lastKnownLayer ~= currentLayer then
 				if currentLayer > 0 then
-					for i, widget in layer.pullout:IterateItems() do
-						if widget.userdata.value == lastKnownLayer then
-							widget:SetText(lastKnownLayer)
-							layer:SetMultiselect(layer:GetMultiselect()) -- the most decent way to trigger dropdown text update
-						elseif widget.userdata.value == currentLayer then
-							widget:SetText(currentLayer .. " (current)")
-							layer:SetMultiselect(layer:GetMultiselect()) -- the most decent way to trigger dropdown text update
+					if layer.pullout then
+						for i, widget in layer.pullout:IterateItems() do
+							if widget.userdata.value == lastKnownLayer then
+								widget:SetText(lastKnownLayer)
+								layer:SetMultiselect(layer:GetMultiselect()) -- the most decent way to trigger dropdown text update
+							elseif widget.userdata.value == currentLayer then
+								widget:SetText(currentLayer .. " (current)")
+								layer:SetMultiselect(layer:GetMultiselect()) -- the most decent way to trigger dropdown text update
+							end
 						end
 					end
 

@@ -247,12 +247,14 @@ local function containsAnyWordFromList(msg, listOfWords, respectWordBoundaries)
 
 	for _, word in ipairs(listOfWords) do
 		local lowerWord = string.lower(word)
+		-- Escape Lua pattern special chars so user-supplied words are treated as literals
+		local escapedWord = lowerWord:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
 		local pattern
 
 		if respectWordBoundaries then
-			pattern = "%f[%a]" .. lowerWord .. "%f[%A]"
+			pattern = "%f[%a]" .. escapedWord .. "%f[%A]"
 		else
-			pattern = lowerWord
+			pattern = escapedWord
 		end
 
 		if string.find(lowerMsg, pattern) then
@@ -267,7 +269,9 @@ local function containsAnyTriggersFromList(msg, listOfTriggers)
 	local lowermsg = string.lower(msg)
 
 	for _, trigger in ipairs(listOfTriggers) do
-		local pattern = string.gsub(trigger, "%*", ".*")
+		-- Escape Lua pattern special chars (except * which is our wildcard), then convert * to .*
+		local pattern = string.gsub(trigger, "([%^%$%(%)%%%.%[%]%+%-%?])", "%%%1")
+		pattern = string.gsub(pattern, "%*", ".*")
 
 		if string.match(lowermsg, "^" .. pattern .. "$") then
 			return trigger -- Return the trigger that matched
@@ -281,7 +285,9 @@ local function containsAnyChannelFromList(channelName, listOfChannelNames)
 	local lowerName = string.lower(channelName)
 
 	for _, pattern in ipairs(listOfChannelNames) do
-		local luaPattern = string.gsub(pattern, "%*", ".*")
+		-- Escape Lua pattern special chars (except * which is our wildcard), then convert * to .*
+		local luaPattern = string.gsub(pattern, "([%^%$%(%)%%%.%[%]%+%-%?])", "%%%1")
+		luaPattern = string.gsub(luaPattern, "%*", ".*")
 
 		if string.match(lowerName, "^" .. luaPattern .. "$") then
 			return channelName -- Return the original channel name if it matches
@@ -354,7 +360,7 @@ function AutoLayer:getCurrentLayer()
 		return
 	end -- No NWB, nothing to do here
 
-	if NWB_CurrentLayer == nil or tonumber(NWB_CurrentLayer) == nil or NWB_CurrentLayer <= 0 then
+	if NWB_CurrentLayer == nil or tonumber(NWB_CurrentLayer) == nil or tonumber(NWB_CurrentLayer) <= 0 then
 		return 0
 	end
 	return tonumber(NWB_CurrentLayer)
@@ -649,12 +655,11 @@ function AutoLayer:ProcessMessage(
 				C_PartyInfo.InviteUnit(name)
 			end
 		end
+		table.insert(recentLayerRequests, { name = name_without_realm, time = time() })
+		self:DebugPrint("Added", name_without_realm, "to list of recent layer requests")
 	else
 		self:DebugPrint("Group is already full (", current_group_size, "in group +", #pendingPlayerInvites, "pending invites). Cannot invite", name_without_realm)
 	end
-
-	table.insert(recentLayerRequests, { name = name_without_realm, time = time() })
-	self:DebugPrint("Added", name_without_realm, "to list of recent layer requests")
 
 	-- check if group is full
 	if self.db.profile.autokick and (current_group_size + #pendingPlayerInvites) >= max_group_size then
@@ -682,13 +687,20 @@ function AutoLayer:ProcessMessage(
 	end
 end
 
+--- Converts a WoW locale string with %s placeholders into a safe Lua pattern.
+--- Escapes all Lua pattern special characters first, then substitutes %%s with (.+).
+local function makeLocalePattern(localeStr)
+	local escaped = localeStr:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1")
+	return escaped:gsub("%%%%s", "(.+)")
+end
+
 ---@diagnostic disable-next-line: inject-field
 function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 	if not self.db.profile.enabled then
 		return
 	end
 
-	local characterName = SystemMessages:match("^" .. ERR_JOINED_GROUP_S:format("(.+)"))
+	local characterName = SystemMessages:match("^" .. makeLocalePattern(ERR_JOINED_GROUP_S))
 	-- X joins the party
 	if characterName then
 		local playerNameWithoutRealm = removeRealmName(characterName)
@@ -726,7 +738,7 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 		end
 	end
 
-	characterName = SystemMessages:match("^" .. ERR_DECLINE_GROUP_S:format("(.+)"))
+	characterName = SystemMessages:match("^" .. makeLocalePattern(ERR_DECLINE_GROUP_S))
 	-- X declines your invite
 	if characterName then
 		local playerNameWithoutRealm = removeRealmName(characterName)
@@ -744,7 +756,7 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 		end
 	end
 
-	characterName = SystemMessages:match("^" .. ERR_INVITE_PLAYER_S:format("(.+)"))
+	characterName = SystemMessages:match("^" .. makeLocalePattern(ERR_INVITE_PLAYER_S))
 	if characterName then
 		local playerNameWithoutRealm = removeRealmName(characterName)
 		self:DebugPrint("ERR_INVITE_PLAYER_S", playerNameWithoutRealm, "found !")
