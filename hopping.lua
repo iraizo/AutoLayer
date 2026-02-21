@@ -8,9 +8,23 @@ addonTable.receive_queue = {}
 local selected_layers = {}
 local is_closed = true
 
+-- Layer request anti-spam cooldown
+local LAYER_REQUEST_COOLDOWN = 10
+local lastLayerRequestTime = 0
+
 function AutoLayer:SendLayerRequest()
+	-- 10s anti-spam cooldown (applies to GUI button and slash command)
+	local now = GetTime and GetTime() or time()
+	if lastLayerRequestTime and (now - lastLayerRequestTime) < LAYER_REQUEST_COOLDOWN then
+		local remaining = math.ceil(LAYER_REQUEST_COOLDOWN - (now - lastLayerRequestTime))
+		self:Print(("Layer request is on cooldown (%ds)."):format(remaining))
+		return
+	end
+	lastLayerRequestTime = now
+
 	local res = "inv layer "
 	res = res .. table.concat(selected_layers, ",")
+
 	-- Send hidden pool metadata to all active layer channels so recipients can enforce pool filtering
 	local pool = self.GetLayerPoolKey and self:GetLayerPoolKey() or "AZEROTH"
 	for _, channelName in ipairs(LAYER_CHANNELS or {}) do
@@ -24,8 +38,10 @@ function AutoLayer:SendLayerRequest()
 		end
 	end
 	self:DebugPrint("[POOL_META_SEND]", "pool=", pool)
+
 	LeaveParty()
 	table.insert(addonTable.send_queue, res)
+	self:Print("Layer request sent.")
 	AutoLayer:DebugPrint("Sending layer request: " .. res)
 	ProcessQueue()
 end
@@ -201,6 +217,17 @@ function AutoLayer:HopGUI()
 			end
 
 			local currentLayer = NWB_CurrentLayer
+
+			-- If the GUI was opened before we knew our layer, auto-select once the layer becomes known.
+			-- This prevents the Send button from staying disabled until the window is reopened.
+			if currentLayer and currentLayer > 0 and (not lastKnownLayer or lastKnownLayer <= 0) and #selected_layers == 0 then
+				for i in ipairs(layers) do
+					if i ~= currentLayer then
+						layer:SetItemValue(i, true)
+						OnValueChanged(nil, nil, i, true) -- SetItemValue doesn't fire callbacks
+					end
+				end
+			end
 
 			if currentLayer and lastKnownLayer ~= currentLayer then
 				if currentLayer > 0 then
