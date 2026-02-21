@@ -102,9 +102,6 @@ addonTable.layerChannels = LAYER_CHANNELS
 local function GenerateLayerChannels()
 	local channels = {}
 
-	-- Always include the static "layer" channel first as primary/fallback
-	table.insert(channels, "layer")
-
 	local t = C_DateAndTime.GetCurrentCalendarTime()
 	local realmName = GetRealmName() or "Unknown"
 
@@ -112,10 +109,10 @@ local function GenerateLayerChannels()
 	local LibDeflate = addonTable.LibDeflate or LibStub and LibStub("LibDeflate")
 	if not LibDeflate then
 		AutoLayer:Print("Error: LibDeflate not found, using fallback channel names")
-		return {"layer", "layer2", "layer3"}
+		return {"layer2", "layer3", "layer"}
 	end
 
-	-- Three date formats for three different channel names
+	-- Three date formats for three different channel names (highest priority channels)
 	local dateFormats = {
 		string.format("%02d-%02d-%04d", t.monthDay, t.month, t.year),  -- dd-mm-yyyy
 		string.format("%04d-%02d-%02d", t.year, t.month, t.monthDay),  -- yyyy-mm-dd
@@ -129,6 +126,9 @@ local function GenerateLayerChannels()
 		local hashStr = string.format("%08x", hash)
 		table.insert(channels, "layer" .. hashStr)
 	end
+
+	-- Static "layer" channel last — true fallback only
+	table.insert(channels, "layer")
 
 	return channels
 end
@@ -915,10 +915,10 @@ function JoinLayerChannel()
 			end
 		end
 
-		-- Inform user if we had to use a fallback (first channel in list is primary)
+		-- Inform user if we had to fall back to the static "layer" channel
 		local primaryChannel = LAYER_CHANNELS[1]
 		if addonTable.activeLayerChannel and addonTable.activeLayerChannel ~= primaryChannel then
-			AutoLayer:Print("Primary channel unavailable, using fallback: " .. addonTable.activeLayerChannel)
+			AutoLayer:Print("Dynamic channel unavailable, using fallback: " .. addonTable.activeLayerChannel)
 		elseif not addonTable.activeLayerChannel then
 			AutoLayer:Print("All layer channels unavailable")
 		end
