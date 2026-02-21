@@ -1,0 +1,562 @@
+diff --git a/hopping.lua b/hopping.lua
+index 389c4dcb65678d4ce98a2d4e514bd64a522e85c9..b82da23fa89a835a3f0891bd491181a40d7a1873 100755
+--- a/hopping.lua
++++ b/hopping.lua
+@@ -1,47 +1,66 @@
+ local addonName, addonTable = ...
+ addonTable.LibDeflate = LibStub("LibDeflate")
+ addonTable.LibSerialize = LibStub("LibSerialize")
+ 
+ addonTable.send_queue = {}
+ addonTable.receive_queue = {}
+ 
+ local selected_layers = {}
+ local is_closed = true
++local hopperSessionID = {}
+ 
+ function AutoLayer:SendLayerRequest()
+ 	local res = "inv layer "
+ 	res = res .. table.concat(selected_layers, ",")
+ 	-- Send hidden pool metadata to all active layer channels so recipients can enforce pool filtering
+ 	local pool = self.GetLayerPoolKey and self:GetLayerPoolKey() or "AZEROTH"
+-	for _, channelName in ipairs(LAYER_CHANNELS or {}) do
++	local channels = addonTable.layerChannels or {}
++	local sentPoolMeta = false
++	for _, channelName in ipairs(channels) do
+ 		local channel_num = GetChannelName(channelName)
+ 		if channel_num and channel_num > 0 then
+ 			if C_ChatInfo and C_ChatInfo.SendAddonMessage then
+ 				C_ChatInfo.SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", channel_num)
++				sentPoolMeta = true
+ 			elseif SendAddonMessage then
+ 				SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", channel_num)
++				sentPoolMeta = true
++			end
++		end
++	end
++
++	-- Fallback: if dynamic channel list is unavailable/not yet joined, send metadata via current active channel
++	if not sentPoolMeta and addonTable.activeLayerChannel then
++		local activeChannelNum = GetChannelName(addonTable.activeLayerChannel)
++		if activeChannelNum and activeChannelNum > 0 then
++			if C_ChatInfo and C_ChatInfo.SendAddonMessage then
++				C_ChatInfo.SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", activeChannelNum)
++				sentPoolMeta = true
++			elseif SendAddonMessage then
++				SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", activeChannelNum)
++				sentPoolMeta = true
+ 			end
+ 		end
+ 	end
+ 	self:DebugPrint("[POOL_META_SEND]", "pool=", pool)
+ 	LeaveParty()
+ 	table.insert(addonTable.send_queue, res)
+ 	AutoLayer:DebugPrint("Sending layer request: " .. res)
+ 	ProcessQueue()
+ end
+ 
+ function AutoLayer:SlashCommandRequest(input)
+ 	if not is_closed then
+ 		return self:Print("Hopper GUI is already open. Use either the GUI or slash commands, not both.")
+ 	end
+ 
+ 	selected_layers = {}
+ 	local slash_layers = self:GetArgs(input, 1, 5)
+ 
+ 	if slash_layers and slash_layers ~= "" then
+ 		self:DebugPrint("Received slash command request for layers:", slash_layers)
+ 
+ 		for layer in string.gmatch(slash_layers, '(%d+)') do
+ 			table.insert(selected_layers, layer)
+ 		end
+ 
+@@ -65,51 +84,51 @@ function AutoLayer:SlashCommandRequest(input)
+ 		AutoLayer:SendLayerRequest()
+ 	end
+ end
+ 
+ function AutoLayer:HopGUI()
+ 	if not is_closed then
+ 		return
+ 	end
+ 
+ 	is_closed = false
+ 	local frame = AceGUI:Create("Frame")
+ 	frame:SetTitle("AutoLayer - Hopper")
+ 	frame:SetWidth(400)
+ 	frame:SetHeight(250)
+ 	frame:SetStatusText("Beta feature")
+ 	frame:SetLayout("Flow")
+ 
+ 	-- Register the frame so it closes when pressing ESC
+ 	_G["AutoLayerHopperFrame"] = frame.frame
+ 	tinsert(UISpecialFrames, "AutoLayerHopperFrame")
+ 
+ 	-- Set a background color and padding
+ 	frame:SetCallback("OnClose", function()
+ 		is_closed = true
+ 		selected_layers = {}
+-		sessionID = {} -- invalidate any running UpdateLayerText timer loops
++		hopperSessionID = {} -- invalidate any running UpdateLayerText timer loops
+ 	end)
+ 
+ 	-- Create send button
+ 	local send = AceGUI:Create("Button")
+ 	send:SetText("Send Layer Request")
+ 	send:SetWidth(160)
+ 	send:SetCallback("OnClick", function()
+ 		AutoLayer:SendLayerRequest()
+ 	end)
+ 
+ 	-- Check if NovaWorldBuffs is installed
+ 	if addonTable.NWB == nil then
+ 		local desc = AceGUI:Create("Label")
+ 		desc:SetText(
+ 			"Please consider installing NovaWorldBuffs addon, it allows you to discover current layer and select layers to hop to."
+ 		)
+ 		desc:SetColor(1, 0, 0)
+ 		desc:SetFullWidth(true)
+ 		frame:AddChild(desc)
+ 	else
+ 		-- Create a header for clarity
+ 		local header = AceGUI:Create("Label")
+ 		header:SetText("Select Layers to Hop to:")
+ 		header:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
+ 		header:SetFullWidth(true)
+@@ -172,68 +191,68 @@ function AutoLayer:HopGUI()
+ 			end
+ 
+ 			-- Enable or disable the Send button
+ 			if #selected_layers > 0 then
+ 				send:SetDisabled(false)
+ 			else
+ 				send:SetDisabled(true)
+ 			end
+ 		end
+ 
+ 		layer:SetCallback("OnValueChanged", OnValueChanged)
+ 
+ 		local currentLayer = NWB_CurrentLayer
+ 
+ 		if currentLayer and currentLayer > 0 then
+ 			-- autoselect all layers except the layer we're currently on
+ 			for i in ipairs(layers) do
+ 				if i ~= currentLayer then
+ 					layer:SetItemValue(i, true)
+ 					OnValueChanged(nil, nil, i, true) -- for god known reasons SetItemValue does not trigger OnValueChanged event so we have to do that manually :/
+ 				end
+ 			end
+ 		end
+ 
+ 		local lastKnownLayer = nil
+-		local sessionID = {} -- unique table reference per GUI open; used to cancel stale timer loops
++		hopperSessionID = {} -- unique table reference per GUI open; used to cancel stale timer loops
+ 		local function UpdateLayerText() -- while UI open, constantly monitors changes to 'NWB_CurrentLayer' and updates UI
+ 			if is_closed then
+ 				return -- session ended, stop the loop
+ 			end
+ 
+ 			local currentLayer = NWB_CurrentLayer
+ 
+ 			if currentLayer and lastKnownLayer ~= currentLayer then
+ 				if currentLayer > 0 then
+ 					for i, widget in layer.pullout:IterateItems() do
+ 						if widget.userdata.value == lastKnownLayer then
+ 							widget:SetText(lastKnownLayer)
+ 							layer:SetMultiselect(layer:GetMultiselect()) -- the most decent way to trigger dropdown text update
+ 						elseif widget.userdata.value == currentLayer then
+ 							widget:SetText(currentLayer .. " (current)")
+ 							layer:SetMultiselect(layer:GetMultiselect()) -- the most decent way to trigger dropdown text update
+ 						end
+ 					end
+ 
+ 					currentLayerLabel:SetText(currentLayer)
+ 					currentLayerLabel:SetColor(0, 1, 0)
+ 				else
+ 					currentLayerLabel:SetText("Unknown (try to target an NPC)")
+ 					currentLayerLabel:SetColor(1, 0, 0)
+ 				end
+ 
+ 				lastKnownLayer = currentLayer
+ 			end
+ 
+-			local capturedSession = sessionID
++			local capturedSession = hopperSessionID
+ 			C_Timer.After(0.5, function()
+-				if capturedSession ~= sessionID then return end -- stale session, discard
++				if capturedSession ~= hopperSessionID then return end -- stale session, discard
+ 				UpdateLayerText()
+ 			end)
+ 		end
+ 		UpdateLayerText()
+ 
+ 		frame:AddChild(layer)
+ 	end
+ 
+ 	frame:AddChild(send)
+ end
+diff --git a/layering.lua b/layering.lua
+index b351423bf8c73e9197fd412b0b64ce4579191142..bcde498e840dc03c0dbb43c1ddd41f3a393fb4d3 100755
+--- a/layering.lua
++++ b/layering.lua
+@@ -66,57 +66,59 @@ do
+ 
+         _AL_Prune()
+     end)
+ 
+     if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
+         C_ChatInfo.RegisterAddonMessagePrefix(AL_POOL_PREFIX)
+     elseif RegisterAddonMessagePrefix then
+         RegisterAddonMessagePrefix(AL_POOL_PREFIX)
+     end
+ end
+ 
+ 
+ local CTL = _G.ChatThrottleLib
+ 
+ -- Cache TTL constants (in seconds)
+ local CACHE_TTL_INVITED = 300   -- 5 minutes: how long to remember an invited player
+ local CACHE_TTL_PENDING = 180   -- 3 minutes: how long to wait for a pending invite
+ local CACHE_TTL_REQUEST = 60    -- 1 minute:  how long to remember a layer request
+ local MAX_RAID_SIZE = 39        -- max group members excluding self in a full raid
+ local MAX_PARTY_SIZE = 4        -- max group members excluding self in a party
+ 
+ local playersInvitedRecently = {}
+ local pendingPlayerInvites = {}
+ local recentLayerRequests = {}
+ local kicked_player_queue = {}
++local pendingInviteNonce = 0
+ 
+ -- Dynamic channel name system with date-based hashing
+ local failedChannels = {} -- Track channels that failed to join (no retries)
+ addonTable.activeLayerChannel = nil
+ 
+ -- Channel list - will be populated after all addons load
+ local LAYER_CHANNELS = {}
++addonTable.layerChannels = LAYER_CHANNELS
+ 
+ -- Generate dynamic channel names based on server date and realm name
+ local function GenerateLayerChannels()
+ 	local channels = {}
+ 
+ 	-- Always include the static "layer" channel first as primary/fallback
+ 	table.insert(channels, "layer")
+ 
+ 	local t = C_DateAndTime.GetCurrentCalendarTime()
+ 	local realmName = GetRealmName() or "Unknown"
+ 
+ 	-- Need LibDeflate for hashing
+ 	local LibDeflate = addonTable.LibDeflate or LibStub and LibStub("LibDeflate")
+ 	if not LibDeflate then
+ 		AutoLayer:Print("Error: LibDeflate not found, using fallback channel names")
+ 		return {"layer", "layer2", "layer3"}
+ 	end
+ 
+ 	-- Three date formats for three different channel names
+ 	local dateFormats = {
+ 		string.format("%02d-%02d-%04d", t.monthDay, t.month, t.year),  -- dd-mm-yyyy
+ 		string.format("%04d-%02d-%02d", t.year, t.month, t.monthDay),  -- yyyy-mm-dd
+ 		string.format("%02d-%02d-%04d", t.month, t.monthDay, t.year),  -- mm-dd-yyyy
+ 	}
+ 
+@@ -358,56 +360,89 @@ function AutoLayer:getCurrentLayer()
+ 	return tonumber(NWB_CurrentLayer)
+ end
+ 
+ -- Autoexec?
+ C_Timer.After(0.1, function()
+ 	AutoLayer:addNWBToAddonTable()
+ 	if addonTable.NWB == nil then
+ 		AutoLayer:Print("Could not find NovaWorldBuffs, disabling NovaWorldBuffs integration")
+ 	end
+ 
+ 	-- Generate dynamic channel names now that LibDeflate is loaded
+ 	local generatedChannels = GenerateLayerChannels()
+ 	for i, ch in ipairs(generatedChannels) do
+ 		LAYER_CHANNELS[i] = ch
+ 	end
+ 
+ 	-- Debug: Show generated channel names
+ 	AutoLayer:DebugPrint("Dynamic layer channels for today:")
+ 	for i, channelName in ipairs(LAYER_CHANNELS) do
+ 		AutoLayer:DebugPrint("  " .. i .. ": " .. channelName)
+ 	end
+ 	-- Cleanup old layer channels from previous days
+ 	CleanupOldLayerChannels()
+ end)
+ 
++local function GetCurrentGroupSizeExcludingSelf()
++	if IsInRaid() then
++		return math.max(0, GetNumGroupMembers() - 1)
++	end
++	return GetNumSubgroupMembers()
++end
++
++local function enqueueKickTarget(name)
++	if not name then
++		return
++	end
++	for _, queuedName in ipairs(kicked_player_queue) do
++		if queuedName == name then
++			return
++		end
++	end
++	table.insert(kicked_player_queue, name)
++end
++
+ function AutoLayer:FindOfflineMembersToKick()
+-	for i = 1, GetNumGroupMembers() do
+-		local name, _, _, _, _, _, _, online, _, _, _, _ = GetRaidRosterInfo(i)
++	if IsInRaid() then
++		for i = 1, GetNumGroupMembers() do
++			local name, _, _, _, _, _, _, online, _, _, _, _ = GetRaidRosterInfo(i)
++			if name and online == false then
++				enqueueKickTarget(name)
++			end
++		end
++		return
++	end
+ 
+-		if online == false then
+-			table.insert(kicked_player_queue, name)
++	if IsInGroup() then
++		for i = 1, GetNumSubgroupMembers() do
++			local unit = "party" .. i
++			if UnitExists(unit) and not UnitIsConnected(unit) then
++				local name = UnitName(unit)
++				if name then
++					enqueueKickTarget(name)
++				end
++			end
+ 		end
+ 	end
+ end
+ 
+ ---@diagnostic disable-next-line:inject-field
+ function AutoLayer:ProcessMessage(
+ 	event,
+ 	msg,
+ 	name,
+ 	languageName,
+ 	channelName,
+ 	playerName2,
+ 	specialFlags,
+ 	zoneChannelID,
+ 	channelIndex,
+ 	channelBaseName
+ )
+ 	if not self.db.profile.enabled or isPlayerLoggingOut() then
+ 		return
+ 	end
+ 
+ 	if event ~= "CHAT_MSG_GUILD" and self.db.profile.guildOnly then
+ 		return
+ 	end
+ 
+@@ -549,106 +584,122 @@ function AutoLayer:ProcessMessage(
+ 		else
+ 			self:DebugPrint("Message requested layers:", table.concat(requestedLayers, ", "))
+ 		end
+ 
+ 		if
+ 			(requestIsInverted and currLayerMatchesRequest) or (not requestIsInverted and not currLayerMatchesRequest)
+ 		then
+ 			self:DebugPrint("Request not satisfied. We are in layer ", currentLayer)
+ 			return
+ 		end
+ 	end
+ 	--If we got this far, then the message is a valid layer request that we can fulfill.
+ 
+ 	-- check if we've already invited this player in the last 5 minutes
+ 	if not isHighPriorityRequest then
+ 		AutoLayer:pruneCache()
+ 		for _, cachedPlayer in ipairs(playersInvitedRecently) do
+ 			if cachedPlayer.name == name_without_realm and cachedPlayer.time + CACHE_TTL_INVITED > time() then
+ 				self:DebugPrint("Already invited", name, "in the last 5 minutes")
+ 				return
+ 			end
+ 		end
+ 	end
+ 
+ 	local max_group_size = MAX_PARTY_SIZE
++	local current_group_size = GetCurrentGroupSizeExcludingSelf()
+ 
+ 	if IsInRaid() then
+ 		max_group_size = MAX_RAID_SIZE
+ 	end
+ 
+ 	-- used to check if we should invite with or without realm name below
+ 	-- due to the fact that era has mega servers (multiple realms in one server)
+ 	-- where we have to invite with the realm name
+ 	-- since those do not exist on anniversary servers and where HasActiveSeason() is true
+ 	-- we can validate it like this for now.
+-	local isSeasonal = C_Seasons.HasActiveSeason()
++	local isSeasonal = C_Seasons and C_Seasons.HasActiveSeason and C_Seasons.HasActiveSeason() or false
+ 
+ 	---@diagnostic disable-next-line: undefined-global
+-	if (GetNumGroupMembers() + #pendingPlayerInvites) <= max_group_size then
+-		self:DebugPrint("Group has room (", GetNumGroupMembers(), "in group +", #pendingPlayerInvites, "pending invites). Inviting", name_without_realm, "to layer", currentLayer)
++	if (current_group_size + #pendingPlayerInvites) < max_group_size then
++		self:DebugPrint("Group has room (", current_group_size, "in group +", #pendingPlayerInvites, "pending invites). Inviting", name_without_realm, "to layer", currentLayer)
+ 		if not isHighPriorityRequest and not self.db.profile.inviteWhisper then
+ 			-- Whisper is off: delay the invite slightly so it doesn't appear instant/spammy
+ 			self:DebugPrint("Auto-whisper is turned off, delaying invite by 500 milliseconds")
+ 			C_Timer.After(0.5, function()
+ 				if isSeasonal then
+ 					C_PartyInfo.InviteUnit(name_without_realm)
+ 				else
+ 					C_PartyInfo.InviteUnit(name)
+ 				end
+ 			end)
+ 		elseif not isHighPriorityRequest and (not currentLayer or currentLayer <= 0) then
+ 			-- Whisper is on but we don't know our layer yet, so we can't send a useful whisper; delay invite
+ 			self:DebugPrint("Auto-whisper is on but current layer is unknown, delaying invite by 500 milliseconds")
+ 			C_Timer.After(0.5, function()
+ 				if isSeasonal then
+ 					C_PartyInfo.InviteUnit(name_without_realm)
+ 				else
+ 					C_PartyInfo.InviteUnit(name)
+ 				end
+ 			end)
+ 		else
+ 			if isSeasonal then
+ 				C_PartyInfo.InviteUnit(name_without_realm)
+ 			else
+ 				C_PartyInfo.InviteUnit(name)
+ 			end
+ 		end
+ 	else
+-		self:DebugPrint("Group is already full (", GetNumGroupMembers(), "in group +", #pendingPlayerInvites, "pending invites). Cannot invite", name_without_realm)
++		self:DebugPrint("Group is already full (", current_group_size, "in group +", #pendingPlayerInvites, "pending invites). Cannot invite", name_without_realm)
+ 	end
+ 
+ 	table.insert(recentLayerRequests, { name = name_without_realm, time = time() })
+ 	self:DebugPrint("Added", name_without_realm, "to list of recent layer requests")
+ 
+ 	-- check if group is full
+-	if self.db.profile.autokick and GetNumGroupMembers() == max_group_size then
++	if self.db.profile.autokick and (current_group_size + #pendingPlayerInvites) >= max_group_size then
+ 		self:DebugPrint("Group is full, kicking")
++		self:FindOfflineMembersToKick()
++
++		-- kick last non-self member of current group (raid or party)
++		local lastMember
++		if IsInRaid() then
++			for i = GetNumGroupMembers(), 1, -1 do
++				local raidName = GetRaidRosterInfo(i)
++				if raidName and removeRealmName(raidName) ~= UnitName("player") then
++					lastMember = raidName
++					break
++				end
++			end
++		elseif IsInGroup() then
++			lastMember = UnitName("party" .. GetNumSubgroupMembers())
++		end
+ 
+-		-- kick last member of raid
+-		local lastMember = GetRaidRosterInfo(GetNumGroupMembers())
+-		table.insert(kicked_player_queue, lastMember)
++		if lastMember then
++			enqueueKickTarget(lastMember)
++		end
+ 
+ 		return
+ 	end
+ end
+ 
+ ---@diagnostic disable-next-line: inject-field
+ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
+ 	if not self.db.profile.enabled then
+ 		return
+ 	end
+ 
+ 	local characterName = SystemMessages:match("^" .. ERR_JOINED_GROUP_S:format("(.+)"))
+ 	-- X joins the party
+ 	if characterName then
+ 		local playerNameWithoutRealm = removeRealmName(characterName)
+ 		self:DebugPrint("ERR_JOINED_GROUP_S", playerNameWithoutRealm, "found !")
+ 		-- Do AutoLayer stuff only if they actually asked for a layer
+ 		-- (this may be a normal player we're inviting for different reasons)
+ 		for i, entry in ipairs(recentLayerRequests) do
+ 			if entry.name == playerNameWithoutRealm then
+ 				self.db.profile.layered = self.db.profile.layered + 1
+ 				table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() - 100 })
+ 				break -- Found the player, no need to continue checking
+ 			end
+ 		end
+@@ -677,57 +728,71 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
+ 	end
+ 
+ 	characterName = SystemMessages:match("^" .. ERR_DECLINE_GROUP_S:format("(.+)"))
+ 	-- X declines your invite
+ 	if characterName then
+ 		local playerNameWithoutRealm = removeRealmName(characterName)
+ 		self:DebugPrint("ERR_DECLINE_GROUP_S", playerNameWithoutRealm, "found !")
+ 		table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() }) --Extend this timer, they don't want in right now
+ 		self:DebugPrint("Adding ", playerNameWithoutRealm, " to cache, reason: declined invite")
+ 
+ 		-- Player declined invite, remove from pending invites
+ 		for i, entry in ipairs(pendingPlayerInvites) do
+ 			if entry.name == playerNameWithoutRealm then
+ 				self:DebugPrint("Removing ", playerNameWithoutRealm, " from pending invites, reason: declined invite")
+ 				table.remove(pendingPlayerInvites, i)
+ 				break -- Found the player, no need to continue checking
+ 			end
+ 		end
+ 	end
+ 
+ 	characterName = SystemMessages:match("^" .. ERR_INVITE_PLAYER_S:format("(.+)"))
+ 	if characterName then
+ 		local playerNameWithoutRealm = removeRealmName(characterName)
+ 		self:DebugPrint("ERR_INVITE_PLAYER_S", playerNameWithoutRealm, "found !")
+ 
+-		-- Player was invited, add to pending invites
+-		table.insert(pendingPlayerInvites, { name = playerNameWithoutRealm, time = time() })
+-		self:DebugPrint("Adding ", playerNameWithoutRealm, " to pending invites")
++		-- Player was invited, add/update pending invite entry
++		local inviteTimestamp = time()
++		pendingInviteNonce = pendingInviteNonce + 1
++		local inviteNonce = pendingInviteNonce
++		local updatedPending = false
++		for _, entry in ipairs(pendingPlayerInvites) do
++			if entry.name == playerNameWithoutRealm then
++				entry.time = inviteTimestamp
++				entry.nonce = inviteNonce
++				updatedPending = true
++				break
++			end
++		end
++		if not updatedPending then
++			table.insert(pendingPlayerInvites, { name = playerNameWithoutRealm, time = inviteTimestamp, nonce = inviteNonce })
++		end
++		self:DebugPrint("Tracking ", playerNameWithoutRealm, " in pending invites")
+ 		-- Set a timer for 3 minutes, if after that time they are still in pending invites, remove them and consider the invite timed out
+ 		C_Timer.After(CACHE_TTL_PENDING, function()
+ 			for i, entry in ipairs(pendingPlayerInvites) do
+-				if entry.name == playerNameWithoutRealm then
++				if entry.name == playerNameWithoutRealm and entry.nonce == inviteNonce then
+ 					self:DebugPrint("Removing ", playerNameWithoutRealm, " from pending invites, reason: invite timed out")
+ 					table.remove(pendingPlayerInvites, i)
+ 					break -- Found the player, no need to continue checking
+ 				end
+ 			end
+ 		end)
+ 
+ 		if self.db.profile.inviteWhisper then
+ 			local currentLayer = AutoLayer:getCurrentLayer()
+ 
+ 			-- I guess don't whisper people if we don't know what layer we're in?
+ 			if currentLayer == nil or currentLayer <= 0 then
+ 				self:DebugPrint("Not whispering since we don't know what layer we're in! (", currentLayer, ")")
+ 				return
+ 			end
+ 
+ 			-- Don't whisper the player unless they specifically asked for a layer
+ 			-- (this may be a normal player we're inviting for different reasons)
+ 			local isPlayerInvited = false
+ 			for i, entry in ipairs(recentLayerRequests) do
+ 				if entry.name == playerNameWithoutRealm then
+ 					isPlayerInvited = true
+ 					break -- Found the player, no need to continue checking
+ 				end
+ 			end

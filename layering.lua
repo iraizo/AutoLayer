@@ -88,6 +88,7 @@ local playersInvitedRecently = {}
 local pendingPlayerInvites = {}
 local recentLayerRequests = {}
 local kicked_player_queue = {}
+local pendingInviteNonce = 0
 
 -- Dynamic channel name system with date-based hashing
 local failedChannels = {} -- Track channels that failed to join (no retries)
@@ -95,6 +96,7 @@ addonTable.activeLayerChannel = nil
 
 -- Channel list - will be populated after all addons load
 local LAYER_CHANNELS = {}
+addonTable.layerChannels = LAYER_CHANNELS
 
 -- Generate dynamic channel names based on server date and realm name
 local function GenerateLayerChannels()
@@ -381,13 +383,46 @@ C_Timer.After(0.1, function()
 end)
 
 function AutoLayer:FindOfflineMembersToKick()
-	for i = 1, GetNumGroupMembers() do
-		local name, _, _, _, _, _, _, online, _, _, _, _ = GetRaidRosterInfo(i)
+	if IsInRaid() then
+		for i = 1, GetNumGroupMembers() do
+			local name, _, _, _, _, _, _, online, _, _, _, _ = GetRaidRosterInfo(i)
+			if name and online == false then
+				enqueueKickTarget(name)
+			end
+		end
+		return
+	end
 
-		if online == false then
-			table.insert(kicked_player_queue, name)
+	if IsInGroup() then
+		for i = 1, GetNumSubgroupMembers() do
+			local unit = "party" .. i
+			if UnitExists(unit) and not UnitIsConnected(unit) then
+				local name = UnitName(unit)
+				if name then
+					enqueueKickTarget(name)
+				end
+			end
 		end
 	end
+end
+
+local function GetCurrentGroupSizeExcludingSelf()
+	if IsInRaid() then
+		return math.max(0, GetNumGroupMembers() - 1)
+	end
+	return GetNumSubgroupMembers()
+end
+
+local function enqueueKickTarget(name)
+	if not name then
+		return
+	end
+	for _, queuedName in ipairs(kicked_player_queue) do
+		if queuedName == name then
+			return
+		end
+	end
+	table.insert(kicked_player_queue, name)
 end
 
 ---@diagnostic disable-next-line:inject-field
@@ -571,6 +606,7 @@ function AutoLayer:ProcessMessage(
 	end
 
 	local max_group_size = MAX_PARTY_SIZE
+	local current_group_size = GetCurrentGroupSizeExcludingSelf()
 
 	if IsInRaid() then
 		max_group_size = MAX_RAID_SIZE
@@ -582,10 +618,11 @@ function AutoLayer:ProcessMessage(
 	-- since those do not exist on anniversary servers and where HasActiveSeason() is true
 	-- we can validate it like this for now.
 	local isSeasonal = C_Seasons.HasActiveSeason()
+	local isSeasonal = C_Seasons and C_Seasons.HasActiveSeason and C_Seasons.HasActiveSeason() or false
 
 	---@diagnostic disable-next-line: undefined-global
-	if (GetNumGroupMembers() + #pendingPlayerInvites) <= max_group_size then
-		self:DebugPrint("Group has room (", GetNumGroupMembers(), "in group +", #pendingPlayerInvites, "pending invites). Inviting", name_without_realm, "to layer", currentLayer)
+	if (current_group_size + #pendingPlayerInvites) < max_group_size then
+		self:DebugPrint("Group has room (", current_group_size, "in group +", #pendingPlayerInvites, "pending invites). Inviting", name_without_realm, "to layer", currentLayer)
 		if not isHighPriorityRequest and not self.db.profile.inviteWhisper then
 			-- Whisper is off: delay the invite slightly so it doesn't appear instant/spammy
 			self:DebugPrint("Auto-whisper is turned off, delaying invite by 500 milliseconds")
@@ -614,19 +651,33 @@ function AutoLayer:ProcessMessage(
 			end
 		end
 	else
-		self:DebugPrint("Group is already full (", GetNumGroupMembers(), "in group +", #pendingPlayerInvites, "pending invites). Cannot invite", name_without_realm)
+		self:DebugPrint("Group is already full (", current_group_size, "in group +", #pendingPlayerInvites, "pending invites). Cannot invite", name_without_realm)
 	end
 
 	table.insert(recentLayerRequests, { name = name_without_realm, time = time() })
 	self:DebugPrint("Added", name_without_realm, "to list of recent layer requests")
 
 	-- check if group is full
-	if self.db.profile.autokick and GetNumGroupMembers() == max_group_size then
+	if self.db.profile.autokick and (current_group_size + #pendingPlayerInvites) >= max_group_size then
 		self:DebugPrint("Group is full, kicking")
+		self:FindOfflineMembersToKick()
 
-		-- kick last member of raid
-		local lastMember = GetRaidRosterInfo(GetNumGroupMembers())
-		table.insert(kicked_player_queue, lastMember)
+		-- kick last non-self member of current group (raid or party)
+		local lastMember
+		if IsInRaid() then
+			for i = GetNumGroupMembers(), 1, -1 do
+				local raidName = GetRaidRosterInfo(i)
+				if raidName and removeRealmName(raidName) ~= UnitName("player") then
+					lastMember = raidName
+					break
+				end
+			end
+		elseif IsInGroup() then
+			lastMember = UnitName("party" .. GetNumSubgroupMembers())
+		end
+		if lastMember then
+			enqueueKickTarget(lastMember)
+		end
 
 		return
 	end
@@ -699,13 +750,27 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 		local playerNameWithoutRealm = removeRealmName(characterName)
 		self:DebugPrint("ERR_INVITE_PLAYER_S", playerNameWithoutRealm, "found !")
 
-		-- Player was invited, add to pending invites
-		table.insert(pendingPlayerInvites, { name = playerNameWithoutRealm, time = time() })
-		self:DebugPrint("Adding ", playerNameWithoutRealm, " to pending invites")
+		-- Player was invited, add/update pending invite entry
+		local inviteTimestamp = time()
+		pendingInviteNonce = pendingInviteNonce + 1
+		local inviteNonce = pendingInviteNonce
+		local updatedPending = false
+		for _, entry in ipairs(pendingPlayerInvites) do
+			if entry.name == playerNameWithoutRealm then
+				entry.time = inviteTimestamp
+				entry.nonce = inviteNonce
+				updatedPending = true
+				break
+			end
+		end
+		if not updatedPending then
+			table.insert(pendingPlayerInvites, { name = playerNameWithoutRealm, time = inviteTimestamp, nonce = inviteNonce })
+		end
+		self:DebugPrint("Tracking ", playerNameWithoutRealm, " in pending invites")
 		-- Set a timer for 3 minutes, if after that time they are still in pending invites, remove them and consider the invite timed out
 		C_Timer.After(CACHE_TTL_PENDING, function()
 			for i, entry in ipairs(pendingPlayerInvites) do
-				if entry.name == playerNameWithoutRealm then
+				if entry.name == playerNameWithoutRealm and entry.nonce == inviteNonce then
 					self:DebugPrint("Removing ", playerNameWithoutRealm, " from pending invites, reason: invite timed out")
 					table.remove(pendingPlayerInvites, i)
 					break -- Found the player, no need to continue checking

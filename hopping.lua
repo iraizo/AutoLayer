@@ -7,6 +7,7 @@ addonTable.receive_queue = {}
 
 local selected_layers = {}
 local is_closed = true
+local hopperSessionID = {}
 
 -- Layer request anti-spam cooldown
 local LAYER_REQUEST_COOLDOWN = 10
@@ -27,13 +28,31 @@ function AutoLayer:SendLayerRequest()
 
 	-- Send hidden pool metadata to all active layer channels so recipients can enforce pool filtering
 	local pool = self.GetLayerPoolKey and self:GetLayerPoolKey() or "AZEROTH"
-	for _, channelName in ipairs(LAYER_CHANNELS or {}) do
+	local channels = addonTable.layerChannels or {}
+	local sentPoolMeta = false
+	for _, channelName in ipairs(channels) do
 		local channel_num = GetChannelName(channelName)
 		if channel_num and channel_num > 0 then
 			if C_ChatInfo and C_ChatInfo.SendAddonMessage then
 				C_ChatInfo.SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", channel_num)
+				sentPoolMeta = true
 			elseif SendAddonMessage then
 				SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", channel_num)
+				sentPoolMeta = true
+			end
+		end
+	end
+
+	-- Fallback: if dynamic channel list is unavailable/not yet joined, send metadata via current active channel
+	if not sentPoolMeta and addonTable.activeLayerChannel then
+		local activeChannelNum = GetChannelName(addonTable.activeLayerChannel)
+		if activeChannelNum and activeChannelNum > 0 then
+			if C_ChatInfo and C_ChatInfo.SendAddonMessage then
+				C_ChatInfo.SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", activeChannelNum)
+				sentPoolMeta = true
+			elseif SendAddonMessage then
+				SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", activeChannelNum)
+				sentPoolMeta = true
 			end
 		end
 	end
@@ -103,7 +122,7 @@ function AutoLayer:HopGUI()
 	frame:SetCallback("OnClose", function()
 		is_closed = true
 		selected_layers = {}
-		sessionID = {} -- invalidate any running UpdateLayerText timer loops
+		hopperSessionID = {} -- invalidate any running UpdateLayerText timer loops
 	end)
 
 	-- Create send button
@@ -210,7 +229,7 @@ function AutoLayer:HopGUI()
 		end
 
 		local lastKnownLayer = nil
-		local sessionID = {} -- unique table reference per GUI open; used to cancel stale timer loops
+		hopperSessionID = {} -- unique table reference per GUI open; used to cancel stale timer loops
 		local function UpdateLayerText() -- while UI open, constantly monitors changes to 'NWB_CurrentLayer' and updates UI
 			if is_closed then
 				return -- session ended, stop the loop
@@ -251,9 +270,9 @@ function AutoLayer:HopGUI()
 				lastKnownLayer = currentLayer
 			end
 
-			local capturedSession = sessionID
+			local capturedSession = hopperSessionID
 			C_Timer.After(0.5, function()
-				if capturedSession ~= sessionID then return end -- stale session, discard
+				if capturedSession ~= hopperSessionID then return end -- stale session, discard
 				UpdateLayerText()
 			end)
 		end
