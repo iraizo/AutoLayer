@@ -97,8 +97,6 @@ function AutoLayer:ParseFilteredChannels()
 	return filteredChannels
 end
 
-local bunnyLDB = ...
-
 function AutoLayer:Toggle()
 	self.db.profile.enabled = not self.db.profile.enabled
 	self:Print(self.db.profile.enabled and "enabled" or "disabled")
