@@ -1,10 +1,94 @@
 local addonName, addonTable = ...
+
+-- TBC-only: locale-proof layer pool detection (mapID based)
+function AutoLayer:GetLayerPoolKey()
+    if C_Map and C_Map.GetBestMapForUnit then
+        local mapID = C_Map.GetBestMapForUnit("player")
+        if mapID then
+            local mi = C_Map.GetMapInfo(mapID)
+
+            while mi and mi.parentMapID and mi.parentMapID ~= 0 do
+                if mi.parentMapID == 1945 then -- Outland continent mapID
+                    return "OUTLAND"
+                end
+                mi = C_Map.GetMapInfo(mi.parentMapID)
+            end
+
+            if mi and mi.mapID == 1945 then
+                return "OUTLAND"
+            end
+        end
+    end
+    return "AZEROTH"
+end
+
+-- Pool metadata via addon messages (TBC)
+local AL_POOL_PREFIX = "ALP" -- short, unlikely to collide
+local AL_POOL_TTL = 3        -- seconds to keep metadata
+
+local _alPoolMetaBySender = {} -- name_without_realm -> { pool="AZEROTH"/"OUTLAND", ts=time() }
+
+local function _AL_Now()
+    return time()
+end
+
+local function _AL_Prune()
+    local now = _AL_Now()
+    for k,v in pairs(_alPoolMetaBySender) do
+        if not v or not v.ts or (now - v.ts) > AL_POOL_TTL then
+            _alPoolMetaBySender[k] = nil
+        end
+    end
+end
+
+-- Listen for pool metadata addon messages
+do
+    local f = CreateFrame("Frame")
+    f:RegisterEvent("CHAT_MSG_ADDON")
+    f:SetScript("OnEvent", function(_, event, prefix, msg, channel, sender)
+        if prefix ~= AL_POOL_PREFIX then return end
+        if not sender or sender == "" then return end
+
+        -- sender may include realm; normalize the same way as ProcessMessage does
+        local name_without_realm = sender
+        if name_without_realm and string.find(name_without_realm, "-") then
+            name_without_realm = string.match(name_without_realm, "^(.-)%-%s*.*$") or name_without_realm
+        end
+
+        if not name_without_realm or name_without_realm == "" then return end
+
+        -- payload: "POOL|AZEROTH" or "POOL|OUTLAND"
+        local kind, pool = string.match(msg or "", "^(%w+)%|(%w+)$")
+        if kind == "POOL" and (pool == "AZEROTH" or pool == "OUTLAND") then
+            _alPoolMetaBySender[name_without_realm] = { pool = pool, ts = _AL_Now() }
+			AutoLayer:DebugPrint("[POOL_META_RECV]", "sender=", tostring(name_without_realm), "pool=", tostring(pool), "rawSender=", tostring(sender))
+        end
+
+        _AL_Prune()
+    end)
+
+    if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
+        C_ChatInfo.RegisterAddonMessagePrefix(AL_POOL_PREFIX)
+    elseif RegisterAddonMessagePrefix then
+        RegisterAddonMessagePrefix(AL_POOL_PREFIX)
+    end
+end
+
+
 local CTL = _G.ChatThrottleLib
+
+-- Cache TTL constants (in seconds)
+local CACHE_TTL_INVITED = 300   -- 5 minutes: how long to remember an invited player
+local CACHE_TTL_PENDING = 180   -- 3 minutes: how long to wait for a pending invite
+local CACHE_TTL_REQUEST = 60    -- 1 minute:  how long to remember a layer request
+local MAX_RAID_SIZE = 39        -- max group members excluding self in a full raid
+local MAX_PARTY_SIZE = 4        -- max group members excluding self in a party
 
 local playersInvitedRecently = {}
 local pendingPlayerInvites = {}
 local recentLayerRequests = {}
 local kicked_player_queue = {}
+local pendingInviteNonce = 0
 
 -- Dynamic channel name system with date-based hashing
 local failedChannels = {} -- Track channels that failed to join (no retries)
@@ -12,6 +96,7 @@ addonTable.activeLayerChannel = nil
 
 -- Channel list - will be populated after all addons load
 local LAYER_CHANNELS = {}
+addonTable.layerChannels = LAYER_CHANNELS
 
 -- Generate dynamic channel names based on server date and realm name
 local function GenerateLayerChannels()
@@ -98,23 +183,26 @@ local function formatWhisperMessage(template, currentLayer)
 end
 
 function AutoLayer:pruneCache()
-	for i, cachedPlayer in ipairs(playersInvitedRecently) do
+	for i = #playersInvitedRecently, 1, -1 do
+		local cachedPlayer = playersInvitedRecently[i]
 		-- delete players that are over 5 minutes old
-		if cachedPlayer.time + 300 < time() then
+		if cachedPlayer.time + CACHE_TTL_INVITED < time() then
 			self:DebugPrint("Removing ", cachedPlayer.name, " from players invited recently")
 			table.remove(playersInvitedRecently, i)
 		end
 	end
-	for i, cachedPlayer in ipairs(recentLayerRequests) do
+	for i = #recentLayerRequests, 1, -1 do
+		local cachedPlayer = recentLayerRequests[i]
 		-- delete players that are over 1 minute old
-		if cachedPlayer.time + 60 < time() then
+		if cachedPlayer.time + CACHE_TTL_REQUEST < time() then
 			self:DebugPrint("Removing ", cachedPlayer.name, " from recent layer requests")
 			table.remove(recentLayerRequests, i)
 		end
 	end
-	for i, cachedPlayer in ipairs(pendingPlayerInvites) do
+	for i = #pendingPlayerInvites, 1, -1 do
+		local cachedPlayer = pendingPlayerInvites[i]
 		-- delete pending invites for players that are over 3 minutes old
-		if cachedPlayer.time + 180 < time() then
+		if cachedPlayer.time + CACHE_TTL_PENDING < time() then
 			self:DebugPrint("Removing ", cachedPlayer.name, " from pending player invites")
 			table.remove(pendingPlayerInvites, i)
 		end
@@ -134,7 +222,7 @@ local function isNumberInList(number, list)
 end
 
 local function removeRealmName(name)
-	return ({ strsplit("-", name) })[1]
+	return string.match(name, "^([^%-]+)") or name
 end
 
 local function stripColorCodes(msg)
@@ -211,29 +299,34 @@ end
 --- @return table<number> layer_numbers List of sorted, unique layer numbers.
 local function parseLayers(message)
 	local layers = {}
+	local rangePositions = {}
 
-	-- Add individual layers
-	for num in string.gmatch(message, "%d+") do
-		layers[#layers + 1] = tonumber(num)
-	end
-
-	-- Expand ranges, e.g. "layer 1-3" is the same as "layer 1,2,3"
+	-- Mark positions occupied by ranges so we don't double-count them
 	for rangeStart, rangeEnd in string.gmatch(message, "(%d+)%-(%d+)") do
 		local startNum = tonumber(rangeStart)
 		local endNum = tonumber(rangeEnd)
-		-- but what if someone is a freak and says "layer 3-1" instead of "layer 1-3"?
+		-- handle reversed ranges like "3-1"
 		if startNum > endNum then
-			startNum, endNum = endNum, startNum -- Swap values if out of order
+			startNum, endNum = endNum, startNum
 		end
 		for i = startNum, endNum do
+			rangePositions[i] = true
 			layers[#layers + 1] = i
+		end
+	end
+
+	-- Add individual numbers only if they weren't already added as part of a range
+	for num in string.gmatch(message, "%d+") do
+		local n = tonumber(num)
+		if not rangePositions[n] then
+			layers[#layers + 1] = n
 		end
 	end
 
 	-- Sort layers
 	table.sort(layers)
 
-	-- Make a new list without duplicates (this code assumes the list is already sorted)
+	-- Deduplicate (list is already sorted)
 	local uniqueLayers = {}
 	uniqueLayers[1] = layers[1]
 	for i = 2, #layers do
@@ -289,12 +382,45 @@ C_Timer.After(0.1, function()
 	CleanupOldLayerChannels()
 end)
 
-function AutoLayer:FindOfflineMembersToKick()
-	for i = 1, GetNumGroupMembers() do
-		local name, _, _, _, _, _, _, online, _, _, _, _ = GetRaidRosterInfo(i)
+local function GetCurrentGroupSizeExcludingSelf()
+	if IsInRaid() then
+		return math.max(0, GetNumGroupMembers() - 1)
+	end
+	return GetNumSubgroupMembers()
+end
 
-		if online == false then
-			table.insert(kicked_player_queue, name)
+local function enqueueKickTarget(name)
+	if not name then
+		return
+	end
+	for _, queuedName in ipairs(kicked_player_queue) do
+		if queuedName == name then
+			return
+		end
+	end
+	table.insert(kicked_player_queue, name)
+end
+
+function AutoLayer:FindOfflineMembersToKick()
+	if IsInRaid() then
+		for i = 1, GetNumGroupMembers() do
+			local name, _, _, _, _, _, _, online, _, _, _, _ = GetRaidRosterInfo(i)
+			if name and online == false then
+				enqueueKickTarget(name)
+			end
+		end
+		return
+	end
+
+	if IsInGroup() then
+		for i = 1, GetNumSubgroupMembers() do
+			local unit = "party" .. i
+			if UnitExists(unit) and not UnitIsConnected(unit) then
+				local name = UnitName(unit)
+				if name then
+					enqueueKickTarget(name)
+				end
+			end
 		end
 	end
 end
@@ -356,6 +482,22 @@ function AutoLayer:ProcessMessage(
 		)
 		return
 	end
+
+	-- Pool enforcement (uses hidden addon metadata)
+	_AL_Prune()
+	local meta = _alPoolMetaBySender[name_without_realm]
+	if not meta then
+		self:DebugPrint("[POOL_ENFORCE]", "sender=", tostring(name_without_realm), "no metadata (legacy sender)")
+	end
+	if meta and meta.pool then
+		local myPool = self:GetLayerPoolKey()
+		if meta.pool ~= myPool then
+			self:DebugPrint("[POOL_ENFORCE]", "sender=", tostring(name_without_realm), "senderPool=", tostring(meta.pool), "myPool=", tostring(myPool), "decision=IGNORE")
+			return
+		end
+		self:DebugPrint("[POOL_ENFORCE]", "sender=", tostring(name_without_realm), "senderPool=", tostring(meta.pool), "myPool=", tostring(myPool), "decision=ALLOW")
+	end
+
 
 	if self.db.profile.channelFiltering == "inclusive" then
 		local inclusiveChannelMatch = containsAnyChannelFromList(channelBaseName, AutoLayer:ParseFilteredChannels())
@@ -456,17 +598,18 @@ function AutoLayer:ProcessMessage(
 	if not isHighPriorityRequest then
 		AutoLayer:pruneCache()
 		for _, cachedPlayer in ipairs(playersInvitedRecently) do
-			if cachedPlayer.name == name_without_realm and cachedPlayer.time + 300 > time() then
+			if cachedPlayer.name == name_without_realm and cachedPlayer.time + CACHE_TTL_INVITED > time() then
 				self:DebugPrint("Already invited", name, "in the last 5 minutes")
 				return
 			end
 		end
 	end
 
-	local max_group_size = 4
+	local max_group_size = MAX_PARTY_SIZE
+	local current_group_size = GetCurrentGroupSizeExcludingSelf()
 
 	if IsInRaid() then
-		max_group_size = 39
+		max_group_size = MAX_RAID_SIZE
 	end
 
 	-- used to check if we should invite with or without realm name below
@@ -474,15 +617,24 @@ function AutoLayer:ProcessMessage(
 	-- where we have to invite with the realm name
 	-- since those do not exist on anniversary servers and where HasActiveSeason() is true
 	-- we can validate it like this for now.
-	local isSeasonal = C_Seasons.HasActiveSeason()
+	local isSeasonal = C_Seasons and C_Seasons.HasActiveSeason and C_Seasons.HasActiveSeason() or false
 
 	---@diagnostic disable-next-line: undefined-global
-	if (GetNumGroupMembers() + #pendingPlayerInvites) <= max_group_size then
-		self:DebugPrint("Group has room (", GetNumGroupMembers(), "in group +", #pendingPlayerInvites, "pending invites). Inviting", name_without_realm, "to layer", currentLayer)
-		if not isHighPriorityRequest and (not self.db.profile.inviteWhisper or not currentLayer or currentLayer <= 0) then
-			self:DebugPrint(
-				"Auto-whisper is turned off or we can't provide a helpful whisper, delaying our invite by 500 miliseconds"
-			)
+	if (current_group_size + #pendingPlayerInvites) < max_group_size then
+		self:DebugPrint("Group has room (", current_group_size, "in group +", #pendingPlayerInvites, "pending invites). Inviting", name_without_realm, "to layer", currentLayer)
+		if not isHighPriorityRequest and not self.db.profile.inviteWhisper then
+			-- Whisper is off: delay the invite slightly so it doesn't appear instant/spammy
+			self:DebugPrint("Auto-whisper is turned off, delaying invite by 500 milliseconds")
+			C_Timer.After(0.5, function()
+				if isSeasonal then
+					C_PartyInfo.InviteUnit(name_without_realm)
+				else
+					C_PartyInfo.InviteUnit(name)
+				end
+			end)
+		elseif not isHighPriorityRequest and (not currentLayer or currentLayer <= 0) then
+			-- Whisper is on but we don't know our layer yet, so we can't send a useful whisper; delay invite
+			self:DebugPrint("Auto-whisper is on but current layer is unknown, delaying invite by 500 milliseconds")
 			C_Timer.After(0.5, function()
 				if isSeasonal then
 					C_PartyInfo.InviteUnit(name_without_realm)
@@ -498,19 +650,34 @@ function AutoLayer:ProcessMessage(
 			end
 		end
 	else
-		self:DebugPrint("Group is already full (", GetNumGroupMembers(), "in group +", #pendingPlayerInvites, "pending invites). Cannot invite", name_without_realm)
+		self:DebugPrint("Group is already full (", current_group_size, "in group +", #pendingPlayerInvites, "pending invites). Cannot invite", name_without_realm)
 	end
 
 	table.insert(recentLayerRequests, { name = name_without_realm, time = time() })
 	self:DebugPrint("Added", name_without_realm, "to list of recent layer requests")
 
 	-- check if group is full
-	if self.db.profile.autokick and GetNumGroupMembers() == max_group_size then
+	if self.db.profile.autokick and (current_group_size + #pendingPlayerInvites) >= max_group_size then
 		self:DebugPrint("Group is full, kicking")
+		self:FindOfflineMembersToKick()
 
+		-- kick last non-self member of current group (raid or party)
+		local lastMember
+		if IsInRaid() then
+			for i = GetNumGroupMembers(), 1, -1 do
+				local raidName = GetRaidRosterInfo(i)
+				if raidName and removeRealmName(raidName) ~= UnitName("player") then
+					lastMember = raidName
+					break
+				end
+			end
+		elseif IsInGroup() then
+			lastMember = UnitName("party" .. GetNumSubgroupMembers())
+		end
 		-- kick last member of raid
-		local lastMember = GetRaidRosterInfo(GetNumGroupMembers())
-		table.insert(kicked_player_queue, lastMember)
+		if lastMember then
+			enqueueKickTarget(lastMember)
+		end
 
 		return
 	end
@@ -583,13 +750,27 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 		local playerNameWithoutRealm = removeRealmName(characterName)
 		self:DebugPrint("ERR_INVITE_PLAYER_S", playerNameWithoutRealm, "found !")
 
-		-- Player was invited, add to pending invites
-		table.insert(pendingPlayerInvites, { name = playerNameWithoutRealm, time = time() })
-		self:DebugPrint("Adding ", playerNameWithoutRealm, " to pending invites")
+		-- Player was invited, add/update pending invite entry
+		local inviteTimestamp = time()
+		pendingInviteNonce = pendingInviteNonce + 1
+		local inviteNonce = pendingInviteNonce
+		local updatedPending = false
+		for _, entry in ipairs(pendingPlayerInvites) do
+			if entry.name == playerNameWithoutRealm then
+				entry.time = inviteTimestamp
+				entry.nonce = inviteNonce
+				updatedPending = true
+				break
+			end
+		end
+		if not updatedPending then
+			table.insert(pendingPlayerInvites, { name = playerNameWithoutRealm, time = inviteTimestamp, nonce = inviteNonce })
+		end
+		self:DebugPrint("Tracking ", playerNameWithoutRealm, " in pending invites")
 		-- Set a timer for 3 minutes, if after that time they are still in pending invites, remove them and consider the invite timed out
-		C_Timer.After(180, function()
+		C_Timer.After(CACHE_TTL_PENDING, function()
 			for i, entry in ipairs(pendingPlayerInvites) do
-				if entry.name == playerNameWithoutRealm then
+				if entry.name == playerNameWithoutRealm and entry.nonce == inviteNonce then
 					self:DebugPrint("Removing ", playerNameWithoutRealm, " from pending invites, reason: invite timed out")
 					table.remove(pendingPlayerInvites, i)
 					break -- Found the player, no need to continue checking
@@ -628,7 +809,8 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 		end
 
 		if self.db.profile.inviteWhisperReminder then
-			local finalMessage2 = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplateReminder)
+			local currentLayerForReminder = AutoLayer:getCurrentLayer()
+			local finalMessage2 = "[AutoLayer] " .. formatWhisperMessage(self.db.profile.inviteWhisperTemplateReminder, currentLayerForReminder or 0)
 			CTL:SendChatMessage("NORMAL", characterName, finalMessage2, "WHISPER", nil, characterName)
 		end
 	end
@@ -639,7 +821,7 @@ function AutoLayer:HandleAutoKick()
 		return
 	end
 
-	if self.db.profile.autokick and #kicked_player_queue >= 0 then
+	if self.db.profile.autokick and #kicked_player_queue > 0 then
 		local name = table.remove(kicked_player_queue, 1)
 
 		if name == nil then
@@ -724,7 +906,7 @@ function JoinLayerChannel()
 	end)
 end
 
-function ProccessQueue()
+function ProcessQueue()
 	AutoLayer:HandleAutoKick()
 	if #addonTable.send_queue > 0 then
 		local payload = table.remove(addonTable.send_queue, 1)
@@ -760,10 +942,10 @@ C_Timer.After(1, function()
 		end
 
 		AutoLayer:HandleAutoKick()
-		ProccessQueue()
+		ProcessQueue()
 	end)
 end)
 
 local f = CreateFrame("Frame", "Test", UIParent)
-f:SetScript("OnKeyDown", ProccessQueue)
+f:SetScript("OnKeyDown", ProcessQueue)
 f:SetPropagateKeyboardInput(true)

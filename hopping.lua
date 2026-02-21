@@ -7,14 +7,62 @@ addonTable.receive_queue = {}
 
 local selected_layers = {}
 local is_closed = true
+local sessionID = {}
+
+-- Layer request anti-spam cooldown
+local LAYER_REQUEST_COOLDOWN = 10
+local lastLayerRequestTime = 0
 
 function AutoLayer:SendLayerRequest()
+	-- 10s anti-spam cooldown (applies to GUI button and slash command)
+	local now = GetTime and GetTime() or time()
+	if lastLayerRequestTime and (now - lastLayerRequestTime) < LAYER_REQUEST_COOLDOWN then
+		local remaining = math.ceil(LAYER_REQUEST_COOLDOWN - (now - lastLayerRequestTime))
+		self:Print(("Layer request is on cooldown (%ds)."):format(remaining))
+		return
+	end
+	lastLayerRequestTime = now
+
 	local res = "inv layer "
 	res = res .. table.concat(selected_layers, ",")
+
+	-- Send hidden pool metadata to all active layer channels so recipients can enforce pool filtering
+	local pool = self.GetLayerPoolKey and self:GetLayerPoolKey() or "AZEROTH"
+	local channels = addonTable.layerChannels or {}
+	local sentPoolMeta = false
+	for _, channelName in ipairs(channels) do
+		local channel_num = GetChannelName(channelName)
+		if channel_num and channel_num > 0 then
+			if C_ChatInfo and C_ChatInfo.SendAddonMessage then
+				C_ChatInfo.SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", channel_num)
+				sentPoolMeta = true
+			elseif SendAddonMessage then
+				SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", channel_num)
+				sentPoolMeta = true
+			end
+		end
+	end
+
+	-- Fallback: if dynamic channel list is unavailable/not yet joined, send metadata via current active channel
+	if not sentPoolMeta and addonTable.activeLayerChannel then
+		local activeChannelNum = GetChannelName(addonTable.activeLayerChannel)
+		if activeChannelNum and activeChannelNum > 0 then
+			if C_ChatInfo and C_ChatInfo.SendAddonMessage then
+				C_ChatInfo.SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", activeChannelNum)
+				sentPoolMeta = true
+			elseif SendAddonMessage then
+				SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", activeChannelNum)
+				sentPoolMeta = true
+			end
+		end
+	end
+	self:DebugPrint("[POOL_META_SEND]", "pool=", pool)
+
 	LeaveParty()
 	table.insert(addonTable.send_queue, res)
+	self:Print("Layer request sent.")
 	AutoLayer:DebugPrint("Sending layer request: " .. res)
-	ProccessQueue()
+	ProcessQueue()
 end
 
 function AutoLayer:SlashCommandRequest(input)
@@ -74,6 +122,7 @@ function AutoLayer:HopGUI()
 	frame:SetCallback("OnClose", function()
 		is_closed = true
 		selected_layers = {}
+		sessionID = {} -- invalidate any running UpdateLayerText timer loops
 	end)
 
 	-- Create send button
@@ -180,12 +229,24 @@ function AutoLayer:HopGUI()
 		end
 
 		local lastKnownLayer = nil
+		local sessionID = {} -- unique table reference per GUI open; used to cancel stale timer loops
 		local function UpdateLayerText() -- while UI open, constantly monitors changes to 'NWB_CurrentLayer' and updates UI
 			if is_closed then
-				return
+				return -- session ended, stop the loop
 			end
 
 			local currentLayer = NWB_CurrentLayer
+
+			-- If the GUI was opened before we knew our layer, auto-select once the layer becomes known.
+			-- This prevents the Send button from staying disabled until the window is reopened.
+			if currentLayer and currentLayer > 0 and (not lastKnownLayer or lastKnownLayer <= 0) and #selected_layers == 0 then
+				for i in ipairs(layers) do
+					if i ~= currentLayer then
+						layer:SetItemValue(i, true)
+						OnValueChanged(nil, nil, i, true) -- SetItemValue doesn't fire callbacks
+					end
+				end
+			end
 
 			if currentLayer and lastKnownLayer ~= currentLayer then
 				if currentLayer > 0 then
@@ -209,7 +270,11 @@ function AutoLayer:HopGUI()
 				lastKnownLayer = currentLayer
 			end
 
-			C_Timer.After(0.5, UpdateLayerText)
+			local capturedSession = sessionID
+			C_Timer.After(0.5, function()
+				if capturedSession ~= sessionID then return end -- stale session, discard
+				UpdateLayerText()
+			end)
 		end
 		UpdateLayerText()
 
