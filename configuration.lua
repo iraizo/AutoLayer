@@ -91,7 +91,8 @@ end
 
 function AutoLayer:ParseFilteredChannels()
 	local filteredChannels = {}
-	for channel in string.gmatch(self.db.profile.filteredChannels, "[^,]+") do
+	local raw = self.db.profile.filteredChannels or ""
+	for channel in string.gmatch(raw, "[^,]+") do
 		table.insert(filteredChannels, string.lower(channel))
 	end
 	return filteredChannels

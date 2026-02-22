@@ -85,6 +85,11 @@ function AutoLayer:SlashCommandRequest(input)
 			return
 		end
 	else
+		if addonTable.NWB == nil or addonTable.NWB.data == nil or addonTable.NWB.data.layers == nil then
+			self:Print("NovaWorldBuffs data is required for '/autolayer req' without explicit layers. Provide layers manually (e.g. '/autolayer req 1,2') or install/enable NovaWorldBuffs.")
+			return
+		end
+		
 		self:DebugPrint("Received slash command request for all layers except current ( layer", NWB_CurrentLayer, ").")
 
 		local count = 0

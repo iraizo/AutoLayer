@@ -278,6 +278,10 @@ local function containsAnyTriggersFromList(msg, listOfTriggers)
 end
 
 local function containsAnyChannelFromList(channelName, listOfChannelNames)
+	if not channelName or channelName == "" then
+		return nil
+	end
+
 	local lowerName = string.lower(channelName)
 
 	for _, pattern in ipairs(listOfChannelNames) do

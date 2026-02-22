@@ -367,6 +367,7 @@ local defaults = {
 		blacklist = "wts,wtb,lfm,lfg,ashen,auto inv,autoinv,pst for,guild,raid,enchant,player,what layer,which layer,WorldBuffs",
 		invertKeywords = "not,off,except,but,out,other than,besides,apart from",
 		channelFiltering = "none",
+		filteredChannels = "",
 		inviteWhisper = true,
 		inviteWhisperTemplate = "Inviting you to layer {layer}...",
 		inviteWhisperReminder = true,
