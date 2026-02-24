@@ -15,7 +15,7 @@ local lastLayerRequestTime = 0
 
 function AutoLayer:SendLayerRequest()
 	-- 10s anti-spam cooldown (applies to GUI button and slash command)
-	local now = GetTime and GetTime() or time()
+	local now = time()
 	if lastLayerRequestTime and (now - lastLayerRequestTime) < LAYER_REQUEST_COOLDOWN then
 		local remaining = math.ceil(LAYER_REQUEST_COOLDOWN - (now - lastLayerRequestTime))
 		self:Print(("Layer request is on cooldown (%ds)."):format(remaining))
