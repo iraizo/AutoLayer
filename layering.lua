@@ -67,11 +67,7 @@ do
         _AL_Prune()
     end)
 
-    if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
-        C_ChatInfo.RegisterAddonMessagePrefix(AL_POOL_PREFIX)
-    elseif RegisterAddonMessagePrefix then
-        RegisterAddonMessagePrefix(AL_POOL_PREFIX)
-    end
+    C_ChatInfo.RegisterAddonMessagePrefix(AL_POOL_PREFIX)
 end
 
 
