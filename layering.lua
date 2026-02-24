@@ -28,12 +28,8 @@ local AL_POOL_TTL = 3        -- seconds to keep metadata
 
 local _alPoolMetaBySender = {} -- name_without_realm -> { pool="AZEROTH"/"OUTLAND", ts=time() }
 
-local function _AL_Now()
-    return time()
-end
-
 local function _AL_Prune()
-    local now = _AL_Now()
+    local now = time()
     for k,v in pairs(_alPoolMetaBySender) do
         if not v or not v.ts or (now - v.ts) > AL_POOL_TTL then
             _alPoolMetaBySender[k] = nil
@@ -60,7 +56,7 @@ do
         -- payload: "POOL|AZEROTH" or "POOL|OUTLAND"
         local kind, pool = string.match(msg or "", "^(%w+)%|(%w+)$")
         if kind == "POOL" and (pool == "AZEROTH" or pool == "OUTLAND") then
-            _alPoolMetaBySender[name_without_realm] = { pool = pool, ts = _AL_Now() }
+            _alPoolMetaBySender[name_without_realm] = { pool = pool, ts = time() }
 			AutoLayer:DebugPrint("[POOL_META_RECV]", "sender=", tostring(name_without_realm), "pool=", tostring(pool), "rawSender=", tostring(sender))
         end
 
