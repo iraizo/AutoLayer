@@ -23,7 +23,7 @@ function AutoLayer:GetLayerPoolKey()
 end
 
 -- Pool metadata via addon messages (TBC)
-local AL_POOL_PREFIX = "ALP" -- short, unlikely to collide
+local AL_POOL_PREFIX = "AutoLayerPool"
 local AL_POOL_TTL = 3        -- seconds to keep metadata
 
 local _alPoolMetaBySender = {} -- name_without_realm -> { pool="AZEROTH"/"OUTLAND", ts=time() }
