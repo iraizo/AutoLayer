@@ -12,6 +12,7 @@ addonTable.activeLayerChannel = nil
 
 -- Channel list - will be populated after all addons load
 local LAYER_CHANNELS = {}
+local channelJoinRetries = 0
 
 -- Generate dynamic channel names based on server date and realm name
 local function GenerateLayerChannels()
@@ -668,6 +669,24 @@ AutoLayer:RegisterEvent("GROUP_ROSTER_UPDATE", "ProcessRosterUpdate")
 function JoinLayerChannel()
 	-- Join ALL channels to prevent griefing (so griefers can't become admin in empty channels)
 	-- Only try each channel once - if it fails (e.g. password protected), don't retry
+
+	-- Wait for default channels (General, Trade) to be joined first
+	-- This prevents our layer channels from taking up low-numbered slots
+	-- After 2 retries (6 seconds total), proceed anyway for players without default channels
+	local channelCount = 0
+	for i = 1, MAX_WOW_CHAT_CHANNELS or 20 do
+		local _, name = GetChannelName(i)
+		if name and name ~= "" then
+			channelCount = channelCount + 1
+		end
+	end
+
+	if channelCount < 2 and channelJoinRetries < 2 then
+		channelJoinRetries = channelJoinRetries + 1
+		AutoLayer:DebugPrint("Waiting for default channels to load... (currently " .. channelCount .. " channels, retry " .. channelJoinRetries .. "/2)")
+		C_Timer.After(2, JoinLayerChannel)
+		return
+	end
 
 	-- Step 1: Attempt to join all channels that are not marked as failed
 	for _, channelName in ipairs(LAYER_CHANNELS) do
