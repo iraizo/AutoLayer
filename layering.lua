@@ -179,9 +179,9 @@ local function containsAnyTriggersFromList(msg, listOfTriggers)
 	local lowermsg = string.lower(msg)
 
 	for _, trigger in ipairs(listOfTriggers) do
-		local pattern = string.gsub(trigger, "%*", ".*")
-
-		if string.match(lowermsg, "^" .. pattern .. "$") then
+		-- Match trigger as a whole word, case-insensitive
+		-- %f[%w] matches word boundary (lowercase w is start of word, uppercase W is end of word)
+		if string.match(lowermsg, "%f[%w]" .. string.lower(trigger) .. "%f[%W]") then
 			return trigger -- Return the trigger that matched
 		end
 	end
