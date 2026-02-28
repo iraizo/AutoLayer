@@ -9,7 +9,14 @@ local selected_layers = {}
 local is_closed = true
 
 function AutoLayer:SendLayerRequest()
-	local res = "inv layer "
+	local res = ""
+
+	if self.db.profile.layerSegments and addonTable.currentLayerSegment then
+		self:DebugPrint("Using layer segment:", addonTable.currentLayerSegment)
+		res = "<" .. addonTable.currentLayerSegment .. "> "
+	end
+
+	res = res .. "inv layer "
 	res = res .. table.concat(selected_layers, ",")
 	LeaveParty()
 	table.insert(addonTable.send_queue, res)

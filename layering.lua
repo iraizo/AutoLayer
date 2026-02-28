@@ -333,6 +333,23 @@ function AutoLayer:ProcessMessage(
 		end
 	end
 
+	-- Check if the message has a layer segment prefix. If it does, it should match our layer segment.
+	local segmentPrefix = msg:match("^<(%w+)> ")
+
+	-- Remove the matched prefix from msg, since it could inadvertently trigger things like blacklist or invert keywords
+	if segmentPrefix then
+		msg = msg:gsub("^<" .. segmentPrefix .. "> ", "")
+	end
+
+	if self.db.profile.layerSegments and addonTable.currentLayerSegment and segmentPrefix then
+		if segmentPrefix ~= addonTable.currentLayerSegment then
+			self:DebugPrint("Message has segment prefix " .. segmentPrefix .. " but we are in segment '" .. addonTable.currentLayerSegment .. "', ignoring")
+			return
+		end
+
+		self:DebugPrint("Message segment prefix " .. segmentPrefix .. " matches our segment")
+	end
+
 	local name_without_realm = removeRealmName(name)
 	if name_without_realm == UnitName("player") then
 		return
@@ -659,11 +676,26 @@ function AutoLayer:ProcessRosterUpdate()
 	self:getCurrentLayer()
 end
 
+function AutoLayer:ProcessZoneChange()
+	if self.db.profile.layerSegments then
+		local layer_segment = self:GetLayerSegment()
+		
+		if layer_segment then
+			addonTable.currentLayerSegment = layer_segment
+			self:DebugPrint("Current layer segment set to:", layer_segment)
+		else
+			addonTable.currentLayerSegment = nil
+			self:Print("|cffff0000ERROR:|r Could not determine layer segment for current zone. This is a bug, please consider reporting it at https://github.com/iraizo/AutoLayer/issues ! Include details about which zone you are in.")
+		end
+	end
+end
+
 AutoLayer:RegisterEvent("CHAT_MSG_CHANNEL", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_WHISPER", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_GUILD", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_SYSTEM", "ProcessSystemMessages")
 AutoLayer:RegisterEvent("GROUP_ROSTER_UPDATE", "ProcessRosterUpdate")
+AutoLayer:RegisterEvent("ZONE_CHANGED_NEW_AREA", "ProcessZoneChange")
 
 function JoinLayerChannel()
 	-- Join ALL channels to prevent griefing (so griefers can't become admin in empty channels)
