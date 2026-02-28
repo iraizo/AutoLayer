@@ -23,8 +23,9 @@ function AutoLayer:GetLayerPoolKey()
 end
 
 -- Pool metadata via addon messages
-local AL_POOL_TTL = 3        -- seconds to keep metadata
+local AL_POOL_PREFIX = "AutoLayerPool"
 addonTable.MessagePrefix = AL_POOL_PREFIX
+local AL_POOL_TTL = 3        -- seconds to keep metadata
 local _alPoolMetaBySender = {} -- name_without_realm -> { pool="AZEROTH"/"OUTLAND", ts=time() }
 
 local function _AL_Prune()
