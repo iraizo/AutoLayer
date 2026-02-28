@@ -22,10 +22,9 @@ function AutoLayer:GetLayerPoolKey()
     return "AZEROTH"
 end
 
--- Pool metadata via addon messages (TBC)
-local AL_POOL_PREFIX = "AutoLayerPool"
+-- Pool metadata via addon messages
 local AL_POOL_TTL = 3        -- seconds to keep metadata
-
+addonTable.MessagePrefix = AL_POOL_PREFIX
 local _alPoolMetaBySender = {} -- name_without_realm -> { pool="AZEROTH"/"OUTLAND", ts=time() }
 
 local function _AL_Prune()
@@ -63,7 +62,9 @@ do
         _AL_Prune()
     end)
 
-    C_ChatInfo.RegisterAddonMessagePrefix(AL_POOL_PREFIX)
+    if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
+        pcall(C_ChatInfo.RegisterAddonMessagePrefix, AL_POOL_PREFIX)
+    end
 end
 
 

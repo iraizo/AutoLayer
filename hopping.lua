@@ -28,32 +28,14 @@ function AutoLayer:SendLayerRequest()
 
 	-- Send hidden pool metadata to all active layer channels so recipients can enforce pool filtering
 	local pool = self.GetLayerPoolKey and self:GetLayerPoolKey() or "AZEROTH"
-	local channels = addonTable.layerChannels or {}
-	local sentPoolMeta = false
+	local channels = addonTable.layerChannels
+	if not channels or #channels == 0 then
+		channels = addonTable.activeLayerChannel and { addonTable.activeLayerChannel } or {}
+	end
 	for _, channelName in ipairs(channels) do
 		local channel_num = GetChannelName(channelName)
 		if channel_num and channel_num > 0 then
-			if C_ChatInfo and C_ChatInfo.SendAddonMessage then
-				C_ChatInfo.SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", channel_num)
-				sentPoolMeta = true
-			elseif SendAddonMessage then
-				SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", channel_num)
-				sentPoolMeta = true
-			end
-		end
-	end
-
-	-- Fallback: if dynamic channel list is unavailable/not yet joined, send metadata via current active channel
-	if not sentPoolMeta and addonTable.activeLayerChannel then
-		local activeChannelNum = GetChannelName(addonTable.activeLayerChannel)
-		if activeChannelNum and activeChannelNum > 0 then
-			if C_ChatInfo and C_ChatInfo.SendAddonMessage then
-				C_ChatInfo.SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", activeChannelNum)
-				sentPoolMeta = true
-			elseif SendAddonMessage then
-				SendAddonMessage("ALP", "POOL|" .. pool, "CHANNEL", activeChannelNum)
-				sentPoolMeta = true
-			end
+			C_ChatInfo.SendAddonMessage(addonTable.MessagePrefix, "POOL|" .. pool, "CHANNEL", channel_num)
 		end
 	end
 	self:DebugPrint("[POOL_META_SEND]", "pool=", pool)
