@@ -465,8 +465,8 @@ local systemMessages = {
 
 -- Layers are sometimes segmented by different areas, this table determines the segments to look for (values should be a name that can be returned by C_Map.GetMapInfo()).
 addonTable.layerSegments = {
-	"Azeroth",
-	"Outland",
+	["AZ"] = "Azeroth",
+	["OL"] = "Outland",
 }
 
 -- Determine in which layer segment the player is.
@@ -479,9 +479,11 @@ function AutoLayer:GetLayerSegment()
 	if not mapInfo then return nil end
 
 	while mapInfo.parentMapID and mapInfo.parentMapID ~= 0 do
-		if tContains(addonTable.layerSegments, mapInfo.name) then
-			self:DebugPrint("Player is in segment:", mapInfo.name)
-			return mapInfo.name
+		for k, v in pairs(addonTable.layerSegments) do
+			if mapInfo.name == v then
+				self:DebugPrint("Player is in segment:", mapInfo.name)
+				return k
+			end
 		end
 
 		mapInfo = C_Map.GetMapInfo(mapInfo.parentMapID)
