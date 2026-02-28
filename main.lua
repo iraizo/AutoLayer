@@ -586,6 +586,10 @@ function AutoLayer:OnInitialize()
 					tooltip:AddLine("Current layer: " .. currentLayer)
 				end
 			end
+
+			if addonTable.currentLayerSegment then
+				tooltip:AddLine("Layer segment: " .. addonTable.layerSegments[addonTable.currentLayerSegment])
+			end
 		end,
 	})
 
