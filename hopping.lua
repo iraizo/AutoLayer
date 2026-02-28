@@ -7,6 +7,7 @@ addonTable.receive_queue = {}
 
 local selected_layers = {}
 local is_closed = true
+local send
 
 function AutoLayer:SendLayerRequest()
 	local res = "inv layer "
@@ -15,6 +16,10 @@ function AutoLayer:SendLayerRequest()
 	table.insert(addonTable.send_queue, res)
 	AutoLayer:DebugPrint("Sending layer request: " .. res)
 	ProccessQueue()
+
+	-- Disable the send button to avoid the user from spam clicking it while the request is being processed
+	send:SetDisabled(true)
+	C_Timer.After(10, function() send:SetDisabled(false) end)
 end
 
 function AutoLayer:SlashCommandRequest(input)
@@ -36,7 +41,7 @@ function AutoLayer:SlashCommandRequest(input)
 			self:Print("No valid layers specified in the request. Use a comma-separated list of layer numbers. For example: /autolayer req 1,2,3")
 			return
 		end
-	else
+	elseif NWB_CurrentLayer and NWB_CurrentLayer > 0 then
 		self:DebugPrint("Received slash command request for all layers except current ( layer", NWB_CurrentLayer, ").")
 
 		local count = 0
@@ -46,11 +51,11 @@ function AutoLayer:SlashCommandRequest(input)
 				table.insert(selected_layers, tostring(count))
 			end
 		end
+	else
+		self:DebugPrint("Received slash command request for all layers except current, but current layer is unknown. Requesting any layer.")
 	end
 
-	if #selected_layers > 0 then
-		AutoLayer:SendLayerRequest()
-	end
+	AutoLayer:SendLayerRequest()
 end
 
 function AutoLayer:HopGUI()
@@ -63,21 +68,20 @@ function AutoLayer:HopGUI()
 	frame:SetTitle("AutoLayer - Hopper")
 	frame:SetWidth(400)
 	frame:SetHeight(250)
-	frame:SetStatusText("Beta feature")
 	frame:SetLayout("Flow")
 
 	-- Register the frame so it closes when pressing ESC
 	_G["AutoLayerHopperFrame"] = frame.frame
 	tinsert(UISpecialFrames, "AutoLayerHopperFrame")
 
-	-- Set a background color and padding
 	frame:SetCallback("OnClose", function()
 		is_closed = true
 		selected_layers = {}
+		send:SetDisabled(false)
 	end)
 
 	-- Create send button
-	local send = AceGUI:Create("Button")
+	send = AceGUI:Create("Button")
 	send:SetText("Send Layer Request")
 	send:SetWidth(160)
 	send:SetCallback("OnClick", function()
@@ -101,8 +105,6 @@ function AutoLayer:HopGUI()
 		header:SetFullWidth(true)
 		header:SetJustifyH("CENTER")
 		frame:AddChild(header)
-
-		send:SetDisabled(true)
 
 		local currentLayerGroup = AceGUI:Create("InlineGroup")
 		currentLayerGroup:SetFullWidth(true)
@@ -159,9 +161,9 @@ function AutoLayer:HopGUI()
 
 			-- Enable or disable the Send button
 			if #selected_layers > 0 then
-				send:SetDisabled(false)
+				send:SetText("Send Layer Request")
 			else
-				send:SetDisabled(true)
+				send:SetText("Request Any Layer")
 			end
 		end
 
@@ -216,5 +218,8 @@ function AutoLayer:HopGUI()
 		frame:AddChild(layer)
 	end
 
+	if #selected_layers == 0 then
+		send:SetText("Request Any Layer")
+	end
 	frame:AddChild(send)
 end
