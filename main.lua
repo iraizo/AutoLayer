@@ -214,6 +214,19 @@ local options = {
                     width = 1,
                     order = 10,
                 },
+				layerSegments = {
+					type = "toggle",
+					name = "Use Layer Segments",
+					desc = "Only invite players in the same layer segment. (e.g. Azeroth, Outland). This avoids party members not layering due to being in a different area of the world that uses different layers.",
+					set = function(info, val)
+						AutoLayer.db.profile.layerSegments = val
+					end,
+					get = function(info)
+						return AutoLayer.db.profile.layerSegments
+					end,
+					width = "full",
+					order = 11,
+				},
 			},
 		},
 
@@ -384,6 +397,7 @@ local defaults = {
 		},
 		autokick = false,
 		turnOffWhileRaidAssist = true,
+		layerSegments = true,
 	},
 }
 
@@ -449,6 +463,37 @@ local systemMessages = {
 	ERR_SET_LOOT_THRESHOLD_S,
 }
 
+-- Layers are sometimes segmented by different areas, this table determines the segments to look for (values should be a name that can be returned by C_Map.GetMapInfo()).
+addonTable.layerSegments = {
+	["AZ"] = "Azeroth",
+	["OL"] = "Outland",
+}
+
+-- Determine in which layer segment the player is.
+-- This is necessary for the addon to work correctly in different segments (e.g. Azeroth vs Outland), as layers are specific to them.
+function AutoLayer:GetLayerSegment()
+	local mapID = C_Map.GetBestMapForUnit("player")
+	if not mapID then return nil end
+
+	local mapInfo = C_Map.GetMapInfo(mapID)
+	if not mapInfo then return nil end
+
+	while mapInfo.parentMapID and mapInfo.parentMapID ~= 0 do
+		for k, v in pairs(addonTable.layerSegments) do
+			if mapInfo.name == v then
+				self:DebugPrint("Player is in segment:", mapInfo.name)
+				return k
+			end
+		end
+
+		mapInfo = C_Map.GetMapInfo(mapInfo.parentMapID)
+	end
+
+	-- If there was no match, return nil
+	self:DebugPrint("Layer segment could not be determined for mapID", C_Map.GetBestMapForUnit("player"), "map name", C_Map.GetMapInfo(mapID).name)
+	return nil
+end
+
 local function matchesAnySystemMessage(msg)
 	for _, systemMessage in ipairs(systemMessages) do
 		-- First escape all Lua pattern special characters
@@ -502,6 +547,10 @@ function AutoLayer:OnInitialize()
 		self:filterChatEventSystemGroupMessages()
 	end
 
+	if self.db.profile.layerSegments then
+		addonTable.currentLayerSegment = self:GetLayerSegment()
+	end
+
 	---@diagnostic disable-next-line: missing-fields
 	local bunnyLDB = LibStub("LibDataBroker-1.1"):NewDataObject("AutoLayer", {
 		type = "data source",
@@ -536,6 +585,10 @@ function AutoLayer:OnInitialize()
 				else
 					tooltip:AddLine("Current layer: " .. currentLayer)
 				end
+			end
+
+			if addonTable.currentLayerSegment then
+				tooltip:AddLine("Layer segment: " .. addonTable.layerSegments[addonTable.currentLayerSegment])
 			end
 		end,
 	})
