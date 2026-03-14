@@ -229,4 +229,10 @@ function AutoLayer:HopGUI()
 		send:SetText("Request Any Layer")
 	end
 	frame:AddChild(send)
+
+	-- Add a label explaining there is a cooldown on layering
+	local cooldownLabel = AceGUI:Create("Label")
+	cooldownLabel:SetText("|cffff0000Note:|r Blizzard enforces an increasing cooldown on layering.\nThe more you attempt to layer, the longer it takes each time.|r")
+	cooldownLabel:SetFullWidth(true)
+	frame:AddChild(cooldownLabel)
 end
