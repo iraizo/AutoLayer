@@ -510,6 +510,7 @@ end
 ---@diagnostic disable-next-line: duplicate-set-field
 function AutoLayer:OnInitialize()
 	LibStub("AceConfig-3.0"):RegisterOptionsTable("AutoLayer", options)
+	LibStub("AceConfigDialog-3.0"):AddToBlizOptions("AutoLayer")
 	self.db = LibStub("AceDB-3.0"):New("AutoLayerDB", defaults)
 	
 	-- Modern API for adding options
