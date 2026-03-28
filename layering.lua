@@ -685,7 +685,10 @@ function AutoLayer:ProcessZoneChange()
 			self:DebugPrint("Current layer segment set to:", layer_segment)
 		else
 			addonTable.currentLayerSegment = nil
-			self:Print("|cffff0000ERROR:|r Could not determine layer segment for current zone. This is a bug, please consider reporting it at https://github.com/iraizo/AutoLayer/issues ! Include details about which zone you are in.")
+			-- Arenas do not have a mapID, so we won't be able to determine a layer segment for them. In any other case, this is probably a new zone that was not yet added.
+			if not IsActiveBattlefieldArena() then
+				self:Print("|cffff0000ERROR:|r Could not determine layer segment for current zone. This is a bug, please consider reporting it at https://github.com/iraizo/AutoLayer/issues ! Include details about which zone you are in.")
+			end
 		end
 	end
 end
