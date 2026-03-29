@@ -490,7 +490,11 @@ function AutoLayer:GetLayerSegment()
 	end
 
 	-- If there was no match, return nil
-	self:DebugPrint("Layer segment could not be determined for mapID", C_Map.GetBestMapForUnit("player"), "map name", C_Map.GetMapInfo(mapID).name)
+	if not IsActiveBattlefieldArena() then
+		-- Arenas do not have a mapID, so we won't be able to determine a layer segment for them. In any other case, we should write a debug message.
+		self:DebugPrint("Layer segment could not be determined for mapID", C_Map.GetBestMapForUnit("player"), "map name", C_Map.GetMapInfo(mapID).name)
+	end
+
 	return nil
 end
 
