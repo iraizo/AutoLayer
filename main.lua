@@ -469,6 +469,12 @@ addonTable.layerSegments = {
 	["OL"] = "Outland",
 }
 
+-- Zone names can be localized in the game client, so sometimes we need to match against their mapID instead of name
+addonTable.layerSegmentMapIDs = {
+	["AZ"] = 947,
+	["OL"] = 1945,
+}
+
 -- Determine in which layer segment the player is.
 -- This is necessary for the addon to work correctly in different segments (e.g. Azeroth vs Outland), as layers are specific to them.
 function AutoLayer:GetLayerSegment()
@@ -479,9 +485,9 @@ function AutoLayer:GetLayerSegment()
 	if not mapInfo then return nil end
 
 	while mapInfo.parentMapID and mapInfo.parentMapID ~= 0 do
-		for k, v in pairs(addonTable.layerSegments) do
-			if mapInfo.name == v then
-				self:DebugPrint("Player is in segment:", mapInfo.name)
+		for k, v in pairs(addonTable.layerSegmentMapIDs) do
+			if mapInfo.mapID == v then
+				self:DebugPrint("Player is in segment:", addonTable.layerSegments[k])
 				return k
 			end
 		end
@@ -490,12 +496,33 @@ function AutoLayer:GetLayerSegment()
 	end
 
 	-- If there was no match, return nil
-	if not IsActiveBattlefieldArena() then
-		-- Arenas do not have a mapID, so we won't be able to determine a layer segment for them. In any other case, we should write a debug message.
+	if not IsActiveBattlefieldArena() and not self:IsInMaplessInstance() then
+		-- Arenas and some instances do not have a mapID, so we won't be able to determine a layer segment for them. In any other case, we should write a debug message.
 		self:DebugPrint("Layer segment could not be determined for mapID", C_Map.GetBestMapForUnit("player"), "map name", C_Map.GetMapInfo(mapID).name)
 	end
 
 	return nil
+end
+
+function AutoLayer:IsInMaplessInstance()
+	-- Determine if the player is in a "mapless" instance, which is an instance that does not return a mapID
+	local maplessInstances = {
+		369, -- Deeprun Tram
+		449, -- Champions' Hall in Stormwind (Alliance PVP Barracks)
+		450, -- Hall of Legends in Orgrimmar (Horde PVP Barracks)
+	}
+
+	local _, _, _, _, _, _, _, instanceID = GetInstanceInfo()
+	self:DebugPrint("Current instance ID:", instanceID)
+
+	for _, id in ipairs(maplessInstances) do
+		if instanceID == id then
+			self:DebugPrint("Player is in a mapless instance with ID:", instanceID)
+			return true
+		end
+	end
+
+	return false
 end
 
 local function matchesAnySystemMessage(msg)
