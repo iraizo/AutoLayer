@@ -498,7 +498,7 @@ function AutoLayer:GetLayerSegment(unitID)
 	end
 
 	-- If there was no match, return nil
-	if not IsActiveBattlefieldArena() and not self:IsInMaplessInstance() then
+	if unitID == "player" and not IsActiveBattlefieldArena() and not self:IsInMaplessInstance() then
 		-- Arenas and some instances do not have a mapID, so we won't be able to determine a layer segment for them. In any other case, we should write a debug message.
 		self:DebugPrint("Layer segment could not be determined for mapID", C_Map.GetBestMapForUnit(unitID), "map name", C_Map.GetMapInfo(mapID).name)
 	end
