@@ -693,12 +693,28 @@ function AutoLayer:ProcessZoneChange()
 	end
 end
 
+function AutoLayer:ProcessGroupJoined()
+	if self.db.profile.layerSegments and not UnitIsGroupLeader("player") then
+		self:DebugPrint("Group joined, comparing layer segments with leader...")
+		-- Grant the game a little bit of time to process the group join and update any relevant information before we compare segments
+		C_Timer.After(2, function()
+			local playerSegment, leaderSegment = AutoLayer:CompareLayerSegments()
+			if playerSegment ~= leaderSegment then
+				self:Print("|cffffff00WARNING:|r You are in " .. (addonTable.layerSegments[playerSegment] or "an unknown segment") ..
+							", while the party leader is in " .. (addonTable.layerSegments[leaderSegment] or "an unknown segment") ..
+							". You will most likely not layer correctly. You can leave the party and try to layer again.")
+			end
+		end)
+	end
+end
+
 AutoLayer:RegisterEvent("CHAT_MSG_CHANNEL", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_WHISPER", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_GUILD", "ProcessMessage")
 AutoLayer:RegisterEvent("CHAT_MSG_SYSTEM", "ProcessSystemMessages")
 AutoLayer:RegisterEvent("GROUP_ROSTER_UPDATE", "ProcessRosterUpdate")
 AutoLayer:RegisterEvent("ZONE_CHANGED_NEW_AREA", "ProcessZoneChange")
+AutoLayer:RegisterEvent("GROUP_JOINED", "ProcessGroupJoined")
 
 function JoinLayerChannel()
 	-- Join ALL channels to prevent griefing (so griefers can't become admin in empty channels)
