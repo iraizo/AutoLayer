@@ -685,6 +685,7 @@ function AutoLayer:ProcessRosterUpdate()
 		if IsInGroup() and not IsInRaid() and UnitIsGroupLeader("player") and (GetNumGroupMembers() + #pendingPlayerInvites) >= 5 then
 			self:DebugPrint("Converting to raid because we are in a party with 5 or more members and we are the leader")
 			ConvertToRaid()
+			self:OverrideLootSettings()
 		end
 
 		if IsInGroup() and IsInRaid() and UnitIsGroupLeader("player") and (GetNumGroupMembers() + #pendingPlayerInvites) < 5 then
