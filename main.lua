@@ -268,13 +268,15 @@ local options = {
 				autokick = {
 					type = "toggle",
 					name = "Auto-Kick on Full",
-					desc = "|cffFF0000Requires manual interaction.|r Kicks the last member if the group is full.",
+					desc = "|cffFF0000Requires manual interaction.|r Kicks the last member if the group is full. Mutually exclusive with Auto-Convert to Raid.",
 					set = function(info, val)
 						AutoLayer.db.profile.autokick = val
+						if val then AutoLayer.db.profile.autoConvertRaid = false end
 					end,
 					get = function(info)
 						return AutoLayer.db.profile.autokick
 					end,
+					disabled = function() return AutoLayer.db.profile.autoConvertRaid end,
 					order = 3,
 				},
 				hideAutoWhispers = {
@@ -364,9 +366,37 @@ local options = {
 					get = function(info)
 						return AutoLayer.db.profile.lootThreshold
 					end,
+					hidden = function() return AutoLayer.db.profile.lootMethod ~= 3 end,
 					order = 3,
 				},
 			},
+		},
+		experimental = {
+			type = "group",
+			name = "Experimental Features",
+			inline = true,
+			order = 4,
+			args = {
+				description = {
+					type = "description",
+					name = "These options are |cffff0000experimental|r and have not been widely tested. Please report any issues or feedback at |cff66beffgithub.com/iraizo/AutoLayer/issues|r",
+					order = 1,
+				},
+				autoConvertRaid = {
+					type = "toggle",
+					name = "Auto-Convert to Raid",
+					desc = "Automatically convert to a raid group if the party is full. Mutually exclusive with Auto-Kick on Full.",
+					set = function(info, val)
+						AutoLayer.db.profile.autoConvertRaid = val
+						if val then AutoLayer.db.profile.autokick = false end
+					end,
+					get = function(info)
+						return AutoLayer.db.profile.autoConvertRaid
+					end,
+					disabled = function() return AutoLayer.db.profile.autokick end,
+					order = 2,
+				}
+			}
 		}
 	},
 }
@@ -398,6 +428,7 @@ local defaults = {
 		autokick = false,
 		turnOffWhileRaidAssist = true,
 		layerSegments = true,
+		autoConvertRaid = false,
 	},
 }
 

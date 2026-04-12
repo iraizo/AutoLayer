@@ -533,6 +533,22 @@ function AutoLayer:ProcessMessage(
 	end
 end
 
+function AutoLayer:OverrideLootSettings()
+	if self.db.profile.overrideLootSettings and UnitIsGroupLeader("player") then
+		local lootMethod, _, _ = C_PartyInfo.GetLootMethod()
+
+		if lootMethod ~= self.db.profile.lootMethod then
+			self:DebugPrint("Setting loot method to", self.db.profile.lootMethod)
+			C_PartyInfo.SetLootMethod(self.db.profile.lootMethod)
+		end
+
+		if self.db.profile.lootMethod == 3 and GetLootThreshold() ~= self.db.profile.lootThreshold then
+			self:DebugPrint("Setting loot threshold to", self.db.profile.lootThreshold)
+			SetLootThreshold(self.db.profile.lootThreshold)
+		end
+	end
+end
+
 ---@diagnostic disable-next-line: inject-field
 function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 	if not self.db.profile.enabled then
@@ -561,20 +577,9 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 				break -- Found the player, no need to continue checking
 			end
 		end
+
 		-- Ensure group loot is set as desired
-		if self.db.profile.overrideLootSettings and UnitIsGroupLeader("player") then
-			local lootMethod, _, _ = C_PartyInfo.GetLootMethod()
-
-			if lootMethod ~= self.db.profile.lootMethod then
-				self:DebugPrint("Setting loot method to", self.db.profile.lootMethod)
-				C_PartyInfo.SetLootMethod(self.db.profile.lootMethod)
-			end
-
-			if self.db.profile.lootMethod == 3 and GetLootThreshold() ~= self.db.profile.lootThreshold then
-				self:DebugPrint("Setting loot threshold to", self.db.profile.lootThreshold)
-				SetLootThreshold(self.db.profile.lootThreshold)
-			end
-		end
+		self:OverrideLootSettings()
 	end
 
 	characterName = SystemMessages:match("^" .. ERR_DECLINE_GROUP_S:format("(.+)"))
@@ -674,6 +679,20 @@ end
 
 function AutoLayer:ProcessRosterUpdate()
 	self:getCurrentLayer()
+
+	-- Check if the party needs to be converted to a raid (or vice versa) if the player has the Auto-Convert to Raid option enabled.
+	if self.db.profile.autoConvertRaid then
+		if IsInGroup() and not IsInRaid() and UnitIsGroupLeader("player") and (GetNumGroupMembers() + #pendingPlayerInvites) >= 5 then
+			self:DebugPrint("Converting to raid because we are in a party with 5 or more members and we are the leader")
+			ConvertToRaid()
+		end
+
+		if IsInGroup() and IsInRaid() and UnitIsGroupLeader("player") and (GetNumGroupMembers() + #pendingPlayerInvites) < 5 then
+			self:DebugPrint("Converting to party because we are in a raid with 5 or fewer members and we are the leader")
+			ConvertToParty()
+			self:OverrideLootSettings()
+		end
+	end
 end
 
 function AutoLayer:ProcessZoneChange()
