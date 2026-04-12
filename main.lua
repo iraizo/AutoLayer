@@ -475,10 +475,12 @@ addonTable.layerSegmentMapIDs = {
 	["OL"] = 1945,
 }
 
--- Determine in which layer segment the player is.
+-- Determine in which layer segment the given unitID is. Defaults to the player if no unitID is given.
 -- This is necessary for the addon to work correctly in different segments (e.g. Azeroth vs Outland), as layers are specific to them.
-function AutoLayer:GetLayerSegment()
-	local mapID = C_Map.GetBestMapForUnit("player")
+function AutoLayer:GetLayerSegment(unitID)
+	unitID = unitID or "player"
+	self:DebugPrint("Determining layer segment for", unitID .. " (" .. UnitName(unitID) .. ")")
+	local mapID = C_Map.GetBestMapForUnit(unitID)
 	if not mapID then return nil end
 
 	local mapInfo = C_Map.GetMapInfo(mapID)
@@ -487,7 +489,7 @@ function AutoLayer:GetLayerSegment()
 	while mapInfo.parentMapID and mapInfo.parentMapID ~= 0 do
 		for k, v in pairs(addonTable.layerSegmentMapIDs) do
 			if mapInfo.mapID == v then
-				self:DebugPrint("Player is in segment:", addonTable.layerSegments[k])
+				self:DebugPrint(UnitName(unitID), "is in segment:", addonTable.layerSegments[k])
 				return k
 			end
 		end
@@ -496,13 +498,54 @@ function AutoLayer:GetLayerSegment()
 	end
 
 	-- If there was no match, return nil
-	if not IsActiveBattlefieldArena() and not self:IsInMaplessInstance() then
+	if unitID == "player" and not IsActiveBattlefieldArena() and not self:IsInMaplessInstance() then
 		-- Arenas and some instances do not have a mapID, so we won't be able to determine a layer segment for them. In any other case, we should write a debug message.
-		self:DebugPrint("Layer segment could not be determined for mapID", C_Map.GetBestMapForUnit("player"), "map name", C_Map.GetMapInfo(mapID).name)
+		self:DebugPrint("Layer segment could not be determined for mapID", C_Map.GetBestMapForUnit(unitID), "map name", C_Map.GetMapInfo(mapID).name)
 	end
 
 	return nil
 end
+
+-- Determine if the party leader is in the same layer segment as the player, if layer segments are enabled.
+function AutoLayer:CompareLayerSegments()
+	if not self.db.profile.layerSegments then
+		return nil, nil -- Layer segments not enabled, so we don't care about the party leader's segment
+	end
+
+	local numGroupMembers = GetNumGroupMembers()
+	if numGroupMembers == 0 then
+		self:DebugPrint("Player is not in a party, so no party leader segment to compare to")
+		return nil, nil
+	end
+
+	-- Iterate through the players in our party until we find the party leader
+	local partyLeaderUnit = nil
+	for i = 1, numGroupMembers do
+		local unitID = "party" .. i
+		if UnitIsGroupLeader(unitID) then
+			partyLeaderUnit = unitID
+			self:DebugPrint("Found party leader unitID:", partyLeaderUnit)
+			break
+		end
+	end
+
+	if not partyLeaderUnit then
+		self:DebugPrint("Could not find party leader unitID")
+		return nil, nil
+	end
+
+	local playerSegment = addonTable.currentLayerSegment or self:GetLayerSegment("player")
+	local leaderSegment = self:GetLayerSegment(partyLeaderUnit)
+
+	if not playerSegment or not leaderSegment then
+		self:DebugPrint("Could not determine layer segment for player or party leader, cannot compare segments")
+		return nil, nil
+	end
+
+	self:DebugPrint("Player segment:", playerSegment, "Leader segment:", leaderSegment)
+
+	return playerSegment, leaderSegment
+end 
 
 function AutoLayer:IsInMaplessInstance()
 	-- Determine if the player is in a "mapless" instance, which is an instance that does not return a mapID
