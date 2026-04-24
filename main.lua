@@ -214,19 +214,6 @@ local options = {
                     width = 1,
                     order = 10,
                 },
-				layerSegments = {
-					type = "toggle",
-					name = "Use Layer Segments",
-					desc = "Only invite players in the same layer segment. (e.g. Azeroth, Outland). This avoids party members not layering due to being in a different area of the world that uses different layers.",
-					set = function(info, val)
-						AutoLayer.db.profile.layerSegments = val
-					end,
-					get = function(info)
-						return AutoLayer.db.profile.layerSegments
-					end,
-					width = "full",
-					order = 11,
-				},
 			},
 		},
 
@@ -310,6 +297,33 @@ local options = {
 						return AutoLayer.db.profile.hideSystemGroupMessages
 					end,
 					order = 5,
+				},
+				layerSegments = {
+					type = "toggle",
+					name = "Use Layer Segments",
+					desc = "Only invite players in the same layer segment. (e.g. Azeroth, Outland). This avoids party members not layering due to being in a different area of the world that uses different layers.",
+					set = function(info, val)
+						AutoLayer.db.profile.layerSegments = val
+					end,
+					get = function(info)
+						return AutoLayer.db.profile.layerSegments
+					end,
+					order = 6,
+				},
+				showLayerWarning = {
+					type = "toggle",
+					name = "Layer Segment Warning",
+					desc = "Show a warning when joining a party with a different layer segment, while the layer segment feature is enabled.",
+					set = function(info, val)
+						AutoLayer.db.profile.showLayerWarning = val
+					end,
+					get = function(info)
+						return AutoLayer.db.profile.showLayerWarning
+					end,
+					disabled = function()
+						return not AutoLayer.db.profile.layerSegments
+					end,
+					order = 7,
 				},
 			},
 		},
@@ -398,6 +412,7 @@ local defaults = {
 		autokick = false,
 		turnOffWhileRaidAssist = true,
 		layerSegments = true,
+		showLayerWarning = true,
 	},
 }
 
@@ -475,11 +490,23 @@ addonTable.layerSegmentMapIDs = {
 	["OL"] = 1945,
 }
 
+-- Some zones are not in the same layer segment as the rest of their continent (e.g. they are technically in Azeroth, but part of the Outland layer segment).
+-- Since the regular checks won't work for them, we need to override them to ensure players in those zones get invited correctly.
+addonTable.layerSegmentOverrides = {
+	[1941] = "OL", -- Eversong Woods, Eastern Kingdoms
+	[1942] = "OL", -- Ghostlands, Eastern Kingdoms
+	[1943] = "OL", -- Azuremyst Isle, Kalimdor
+	[1947] = "OL", -- The Exodar, Kalimdor
+	[1950] = "OL", -- Bloodmyst Isle, Kalimdor
+	[1954] = "OL", -- Silvermoon City, Eastern Kingdoms
+	[1957] = "OL", -- Isle of Quel'Danas, Eastern Kingdoms
+}
+
 -- Determine in which layer segment the given unitID is. Defaults to the player if no unitID is given.
 -- This is necessary for the addon to work correctly in different segments (e.g. Azeroth vs Outland), as layers are specific to them.
 function AutoLayer:GetLayerSegment(unitID)
 	unitID = unitID or "player"
-	self:DebugPrint("Determining layer segment for", unitID .. " (" .. UnitName(unitID) .. ")")
+	self:DebugPrint("Determining layer segment for", unitID, "(", UnitName(unitID), ")")
 	local mapID = C_Map.GetBestMapForUnit(unitID)
 	if not mapID then return nil end
 
@@ -487,6 +514,14 @@ function AutoLayer:GetLayerSegment(unitID)
 	if not mapInfo then return nil end
 
 	while mapInfo.parentMapID and mapInfo.parentMapID ~= 0 do
+		-- Check if this mapID has a layer segment override, if so return the override value
+		if addonTable.layerSegmentOverrides[mapInfo.mapID] then
+			local overrideSegment = addonTable.layerSegmentOverrides[mapInfo.mapID]
+			self:DebugPrint(UnitName(unitID), "is in segment:", addonTable.layerSegments[overrideSegment], "( override for mapID", mapInfo.mapID, ")")
+			return overrideSegment
+		end
+
+		-- Check if the current mapID matches any of the layer segment mapIDs, if so return the corresponding segment
 		for k, v in pairs(addonTable.layerSegmentMapIDs) do
 			if mapInfo.mapID == v then
 				self:DebugPrint(UnitName(unitID), "is in segment:", addonTable.layerSegments[k])

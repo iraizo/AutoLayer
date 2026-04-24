@@ -694,7 +694,7 @@ function AutoLayer:ProcessZoneChange()
 end
 
 function AutoLayer:ProcessGroupJoined()
-	if self.db.profile.layerSegments and not UnitIsGroupLeader("player") then
+	if self.db.profile.layerSegments and self.db.profile.showLayerWarning and not UnitIsGroupLeader("player") then
 		self:DebugPrint("Group joined, comparing layer segments with leader...")
 		-- Grant the game a little bit of time to process the group join and update any relevant information before we compare segments
 		C_Timer.After(2, function()
