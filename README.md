@@ -35,3 +35,9 @@ AutoLayer is a **community-driven addon** for World of Warcraft designed to faci
 
 ## Why Use AutoLayer?
 AutoLayer thrives on community participation! The more players who use it, the better it becomes at facilitating layer changes for everyone.
+
+## Slash Commands
+- `/autolayer` opens the AutoLayer settings GUI.
+- `/autolayer status` shows the current addon state, layer/segment info, channel status, queue size, and key behavior toggles.
+- `/autolayer stats` shows lifetime layered count plus session counters for matched requests, invites, joins, declines, timeouts, and auto-kicks.
+- `/autolayer req [layers]` sends a layer hop request. If omitted, it requests all layers except the current one.

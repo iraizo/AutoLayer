@@ -616,6 +616,93 @@ local function matchesAnySystemMessage(msg)
 	return false
 end
 
+local function formatOnOff(value)
+	return value and "on" or "off"
+end
+
+local function getCurrentLayerDisplay()
+	if addonTable.NWB == nil then
+		return "unknown"
+	end
+
+	local currentLayer = AutoLayer:getCurrentLayer()
+	if not currentLayer or currentLayer <= 0 then
+		return "unknown"
+	end
+
+	return tostring(currentLayer)
+end
+
+local function getCurrentSegmentDisplay()
+	if not AutoLayer.db.profile.layerSegments then
+		return "off"
+	end
+
+	local currentSegment = addonTable.currentLayerSegment or AutoLayer:GetLayerSegment()
+	if not currentSegment then
+		return "unknown"
+	end
+
+	return addonTable.layerSegments[currentSegment] or currentSegment
+end
+
+local function getInviteAuthorityDisplay()
+	if not IsInGroup() and not IsInRaid() then
+		return "leader"
+	end
+
+	if UnitIsGroupLeader("player") then
+		return "leader"
+	end
+
+	if IsInRaid() and UnitIsGroupAssistant("player") then
+		return "raid assist"
+	end
+
+	return "no invite permissions"
+end
+
+function AutoLayer:SlashCommandStatus()
+	local enabledState = self.db.profile.enabled and "enabled" or "disabled"
+	local activeChannel = addonTable.activeLayerChannel or "unavailable"
+	local primaryChannel = self:GetPrimaryLayerChannel() or "layer"
+
+	self:Print("Status:")
+	self:Print("State: " .. enabledState)
+	self:Print("Current layer: " .. getCurrentLayerDisplay())
+	self:Print("Layer segment: " .. getCurrentSegmentDisplay())
+	self:Print("Invite authority: " .. getInviteAuthorityDisplay())
+	self:Print("Layer channel: " .. activeChannel)
+
+	if addonTable.activeLayerChannel and addonTable.activeLayerChannel ~= primaryChannel then
+		self:Print("Channel mode: fallback from " .. primaryChannel)
+	end
+
+	self:Print("Pending invites: " .. self:GetPendingInviteCount())
+	self:Print("Queued requests: " .. #addonTable.send_queue)
+	self:Print(
+		"Flags: guild only "
+			.. formatOnOff(self.db.profile.guildOnly)
+			.. ", auto-kick "
+			.. formatOnOff(self.db.profile.autokick)
+			.. ", mute sounds "
+			.. formatOnOff(self.db.profile.mutesounds)
+	)
+end
+
+function AutoLayer:SlashCommandStats()
+	local stats = self:GetRuntimeStats()
+
+	self:Print("Stats:")
+	self:Print("Lifetime layered: " .. self.db.profile.layered)
+	self:Print("Session matched requests: " .. stats.matchedRequests)
+	self:Print("Session invites sent: " .. stats.invitesSent)
+	self:Print("Session joins completed: " .. stats.joinsCompleted)
+	self:Print("Session declines: " .. stats.declinesReceived)
+	self:Print("Session invite timeouts: " .. stats.inviteTimeouts)
+	self:Print("Session auto-kicks: " .. stats.autoKicksExecuted)
+end
+
 ---@diagnostic disable-next-line: duplicate-set-field
 function AutoLayer:OnInitialize()
 	LibStub("AceConfig-3.0"):RegisterOptionsTable("AutoLayer", options)
@@ -633,9 +720,6 @@ function AutoLayer:OnInitialize()
 		else
 			AutoLayer:SlashCommand(input)
 		end
-	end)
-	self:RegisterChatCommand("al", function()
-		AceConfigDialog:Open("AutoLayer")
 	end)
 	local icon = ""
 
@@ -753,6 +837,10 @@ function AutoLayer:SlashCommand(input)
 		return AutoLayer:SlashCommandHelp()
 	elseif command == "req" then
 		return AutoLayer:SlashCommandRequest(input)
+	elseif command == "status" then
+		return AutoLayer:SlashCommandStatus()
+	elseif command == "stats" then
+		return AutoLayer:SlashCommandStats()
 	else
 		return self:Print("Unknown command " .. command .. ". Type /autolayer help for a list of commands.")
 	end
@@ -760,7 +848,9 @@ end
 
 function AutoLayer:SlashCommandHelp()
 	self:Print("AutoLayer Slash Commands:")
-	self:Print("/autolayer or /al - Open the AutoLayer settings GUI.")
+	self:Print("/autolayer - Open the AutoLayer settings GUI.")
+	self:Print("/autolayer status - Show runtime addon status and queue state.")
+	self:Print("/autolayer stats - Show lifetime and session activity counters.")
 	self:Print("/autolayer req [layers] - Send a layer hop request via chat. '[layers]' is a comma-separated list of layer numbers to request. If omitted, requests all layers except the current one.")
 end
 

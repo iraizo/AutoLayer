@@ -5,6 +5,14 @@ local playersInvitedRecently = {}
 local pendingPlayerInvites = {}
 local recentLayerRequests = {}
 local kicked_player_queue = {}
+local runtimeStats = {
+	matchedRequests = 0,
+	invitesSent = 0,
+	joinsCompleted = 0,
+	declinesReceived = 0,
+	inviteTimeouts = 0,
+	autoKicksExecuted = 0,
+}
 
 -- Dynamic channel name system with date-based hashing
 local failedChannels = {} -- Track channels that failed to join (no retries)
@@ -116,9 +124,22 @@ function AutoLayer:pruneCache()
 		-- delete pending invites for players that are over 3 minutes old
 		if cachedPlayer.time + 180 < time() then
 			self:DebugPrint("Removing ", cachedPlayer.name, " from pending player invites")
+			runtimeStats.inviteTimeouts = runtimeStats.inviteTimeouts + 1
 			table.remove(pendingPlayerInvites, i)
 		end
 	end
+end
+
+function AutoLayer:GetRuntimeStats()
+	return runtimeStats
+end
+
+function AutoLayer:GetPendingInviteCount()
+	return #pendingPlayerInvites
+end
+
+function AutoLayer:GetPrimaryLayerChannel()
+	return LAYER_CHANNELS[1]
 end
 
 --- @param number number The number to check for in the list.
@@ -468,6 +489,7 @@ function AutoLayer:ProcessMessage(
 		end
 	end
 	--If we got this far, then the message is a valid layer request that we can fulfill.
+	runtimeStats.matchedRequests = runtimeStats.matchedRequests + 1
 
 	-- check if we've already invited this player in the last 5 minutes
 	if not isHighPriorityRequest then
@@ -549,6 +571,7 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 		for i, entry in ipairs(recentLayerRequests) do
 			if entry.name == playerNameWithoutRealm then
 				self.db.profile.layered = self.db.profile.layered + 1
+				runtimeStats.joinsCompleted = runtimeStats.joinsCompleted + 1
 				table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() - 100 })
 				break -- Found the player, no need to continue checking
 			end
@@ -582,6 +605,7 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 	if characterName then
 		local playerNameWithoutRealm = removeRealmName(characterName)
 		self:DebugPrint("ERR_DECLINE_GROUP_S", playerNameWithoutRealm, "found !")
+		runtimeStats.declinesReceived = runtimeStats.declinesReceived + 1
 		table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() }) --Extend this timer, they don't want in right now
 		self:DebugPrint("Adding ", playerNameWithoutRealm, " to cache, reason: declined invite")
 
@@ -599,6 +623,7 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 	if characterName then
 		local playerNameWithoutRealm = removeRealmName(characterName)
 		self:DebugPrint("ERR_INVITE_PLAYER_S", playerNameWithoutRealm, "found !")
+		runtimeStats.invitesSent = runtimeStats.invitesSent + 1
 
 		-- Player was invited, add to pending invites
 		table.insert(pendingPlayerInvites, { name = playerNameWithoutRealm, time = time() })
@@ -608,6 +633,7 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 			for i, entry in ipairs(pendingPlayerInvites) do
 				if entry.name == playerNameWithoutRealm then
 					self:DebugPrint("Removing ", playerNameWithoutRealm, " from pending invites, reason: invite timed out")
+					runtimeStats.inviteTimeouts = runtimeStats.inviteTimeouts + 1
 					table.remove(pendingPlayerInvites, i)
 					break -- Found the player, no need to continue checking
 				end
@@ -668,6 +694,7 @@ function AutoLayer:HandleAutoKick()
 		end
 
 		self:DebugPrint("Kicking ", name)
+		runtimeStats.autoKicksExecuted = runtimeStats.autoKicksExecuted + 1
 		UninviteUnit(name)
 	end
 end
