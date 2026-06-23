@@ -230,12 +230,17 @@ end
 ---
 --- @param message string The input string containing layer numbers.
 --- @return table<number> layer_numbers List of sorted, unique layer numbers.
+local MAX_LAYER = 20
+
 local function parseLayers(message)
 	local layers = {}
 
 	-- Add individual layers
 	for num in string.gmatch(message, "%d+") do
-		layers[#layers + 1] = tonumber(num)
+		local n = tonumber(num)
+		if n >= 1 and n <= MAX_LAYER then
+			layers[#layers + 1] = n
+		end
 	end
 
 	-- Expand ranges, e.g. "layer 1-3" is the same as "layer 1,2,3"
@@ -246,8 +251,14 @@ local function parseLayers(message)
 		if startNum > endNum then
 			startNum, endNum = endNum, startNum -- Swap values if out of order
 		end
-		for i = startNum, endNum do
-			layers[#layers + 1] = i
+
+		-- Skip ranges entirely outside the valid layer range
+		if startNum <= MAX_LAYER and endNum >= 1 then
+			startNum = math.max(1, math.min(startNum, MAX_LAYER))
+			endNum = math.max(1, math.min(endNum, MAX_LAYER))
+			for i = startNum, endNum do
+				layers[#layers + 1] = i
+			end
 		end
 	end
 
