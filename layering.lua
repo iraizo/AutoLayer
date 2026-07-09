@@ -83,6 +83,28 @@ local function CleanupOldLayerChannels()
 	end
 end
 
+-- Fix layer channels that displaced default Blizzard channels (General, Trade, etc.)
+-- WoW's chat cache can rejoin layer channels before defaults on next login,
+-- causing /1 to land in a layer channel instead of General.
+local MAX_DEFAULT_CHANNEL_SLOT = 5
+local function FixMisplacedChannels()
+	local channelsLeft = false
+
+	for _, channelName in ipairs(LAYER_CHANNELS) do
+		local slot = GetChannelName(channelName)
+		if slot > 0 and slot <= MAX_DEFAULT_CHANNEL_SLOT then
+			AutoLayer:DebugPrint("FixMisplacedChannels: Layer channel '" .. channelName .. "' in slot " .. slot .. " - leaving to free default slot")
+			LeaveChannelByName(channelName)
+			channelsLeft = true
+		end
+	end
+
+	if channelsLeft then
+		AutoLayer:DebugPrint("FixMisplacedChannels: Scheduling rejoin in 30 seconds for default channels to establish")
+		C_Timer.After(30, JoinLayerChannel)
+	end
+end
+
 --- @return boolean is_logging_out Whether the current player is logging out
 local function isPlayerLoggingOut()
 	local isLoggingOut = false
@@ -319,6 +341,7 @@ C_Timer.After(0.1, function()
 	end
 	-- Cleanup old layer channels from previous days
 	CleanupOldLayerChannels()
+	FixMisplacedChannels()
 end)
 
 function AutoLayer:FindOfflineMembersToKick()
