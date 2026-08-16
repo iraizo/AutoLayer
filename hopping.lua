@@ -19,7 +19,7 @@ function AutoLayer:SendLayerRequest()
 
 	res = res .. "inv layer "
 	res = res .. table.concat(selected_layers, ",")
-	LeaveParty()
+	C_PartyInfo.LeaveParty()
 	table.insert(addonTable.send_queue, res)
 	AutoLayer:DebugPrint("Sending layer request: " .. res)
 	ProccessQueue()
