@@ -9,6 +9,8 @@ local selected_layers = {}
 local is_closed = true
 local send
 
+local LeaveParty = C_PartyInfo and C_PartyInfo.LeaveParty or LeaveParty
+
 function AutoLayer:SendLayerRequest()
 	local res = ""
 
@@ -19,7 +21,7 @@ function AutoLayer:SendLayerRequest()
 
 	res = res .. "inv layer "
 	res = res .. table.concat(selected_layers, ",")
-	C_PartyInfo.LeaveParty()
+	LeaveParty()
 	table.insert(addonTable.send_queue, res)
 	AutoLayer:DebugPrint("Sending layer request: " .. res)
 	ProccessQueue()
