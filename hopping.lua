@@ -13,8 +13,16 @@ local LeaveParty = C_PartyInfo and C_PartyInfo.LeaveParty or LeaveParty
 
 function AutoLayer:SendLayerRequest()
 	local res = ""
+	local pendingLayerHop
 
-	if self.db.profile.layerSegments and addonTable.currentLayerSegment then
+	if addonTable.flavor == "bcc" then
+		local scopeID = self:GetLayerZone()
+		res = self:BuildLayerRequestHeader(scopeID) .. " "
+		pendingLayerHop = {
+			scopeID = scopeID,
+			sentAt = time(),
+		}
+	elseif self.db.profile.layerSegments and addonTable.currentLayerSegment then
 		self:DebugPrint("Using layer segment:", addonTable.currentLayerSegment)
 		res = "<" .. addonTable.currentLayerSegment .. "> "
 	end
@@ -23,6 +31,14 @@ function AutoLayer:SendLayerRequest()
 	res = res .. table.concat(selected_layers, ",")
 	LeaveParty()
 	table.insert(addonTable.send_queue, res)
+	if pendingLayerHop then
+		addonTable.pendingLayerHop = pendingLayerHop
+		C_Timer.After(300, function()
+			if addonTable.pendingLayerHop == pendingLayerHop then
+				addonTable.pendingLayerHop = nil
+			end
+		end)
+	end
 	AutoLayer:DebugPrint("Sending layer request: " .. res)
 	ProccessQueue()
 

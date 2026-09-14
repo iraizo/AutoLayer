@@ -1,0 +1,12 @@
+## Interface: 11508, 11509
+## Title: AutoLayer
+## Notes: Automatically invites people that want to layer switch
+## Author: raizo
+## Version: 1.9.6
+## SavedVariables: AutoLayerDB
+
+embeds.xml
+main.lua
+configuration.lua
+layering.lua
+hopping.lua

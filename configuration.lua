@@ -114,7 +114,7 @@ function AutoLayer:Toggle()
 			self:MuteAnnoyingSounds()
 		end
 
-		addonTable.bunnyLDB.icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_enabled_icon]]
+		addonTable.bunnyLDB.icon = [[Interface\AddOns\AutoLayer\Textures\AutoLayer_enabled_icon]]
 	else
 		if self.db.profile.hideAutoWhispers then
 			self.unfilterChatEventAutoLayerWhisperMessages()
@@ -126,6 +126,6 @@ function AutoLayer:Toggle()
 			self:UnmuteAnnoyingSounds()
 		end
 
-		addonTable.bunnyLDB.icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_disabled_icon]]
+		addonTable.bunnyLDB.icon = [[Interface\AddOns\AutoLayer\Textures\AutoLayer_disabled_icon]]
 	end
 end

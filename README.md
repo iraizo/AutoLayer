@@ -1,43 +1,28 @@
 # AutoLayer - WoW Layering Community Addon
 
-AutoLayer is a **community-driven addon** for World of Warcraft designed to facilitate seamless layer switching. It automates the process of inviting players requesting layer changes via chat. The more people use AutoLayer, the easier it becomes for everyone to switch layers!
+AutoLayer automates layer-switching invites for World of Warcraft Classic Era and Burning Crusade Classic.
+
+## Supported Clients
+
+- **Classic Era**: Interfaces `11508` and `11509`
+- **Burning Crusade Classic**: Interface `20506`
+- Client-specific API and protocol compatibility
+- Optional zone checks for BCC layer invites
 
 ## Features
 
-### General Settings
-- **Enable/Disable**: Toggle the addon on or off as needed.
-- **Debug Mode**: View detailed logs for troubleshooting.
-- **Minimap Icon**: Option to show or hide the minimap icon.
-- **Guild Only**: Only invite players from your guild.
-
-### Layer Hopper
-- **Quick Layer Hopping**: Right-click the minimap icon to open the **Layer Hopper** GUI, a simple interface to send layer change requests and easily hop between layers.
-
-### Messaging Settings
-- **Invite Triggers**: Customize keywords to detect layer change requests in chat.
-- **Blacklist**: Exclude messages with specific keywords to avoid unwanted triggers.
-- **Invert Keywords**: Specify terms to ignore or exclude particular layers.
-- **Channel Filtering**: Choose to exclude certain chat channels from triggering layer invites. Or choose to only trigger from your preferred channels.
-- **Whisper Invites**: Send personalized whispers to players being invited.
-  - **Template Support**: Use `{layer}` to include the layer number dynamically.
-  - **Reminder Text**: Add an optional second line to remind players to leave the group after switching layers.
-- **Ignored Prefixes**: Ignore messages with certain prefixes, such as `[NWB]`, to avoid NWB announcements in chat to trigger a layer invite.
-
-### Sound and Behavior
-- **Mute Sounds**: Suppress party-related sounds while the addon is active.
-- **Disable in Raid Assist**: Automatically turn off the addon when you're raid assisting.
-- **Auto-Kick**: (Manual interaction required) Automatically remove the last group member when the group is full.
-- **Hide AddOn Whipsers**: Silence auto whispers sent out by AutoLayer.
-- **Hide Group Notices**: Silence system group notices e.g. "X has left the party".
-
-### Loot Settings
-- **Override Loot Settings**: Automatically set desired loot method and threshold when new players join the party (e.g. always set Loot Method to "Free For All" instead of "Group Loot")
-
-## Why Use AutoLayer?
-AutoLayer thrives on community participation! The more players who use it, the better it becomes at facilitating layer changes for everyone.
+- Configurable invite triggers, blacklist, ignored prefixes, and channel filters
+- Whisper notifications with customizable templates
+- Layer Hopper GUI and `/autolayer req [layers]`
+- Group-capacity checks, including pending invites
+- Leader and raid-assistant permission checks
+- Manual auto-kick queue for offline or oldest group members
+- Optional party sounds and system-message suppression
+- Optional loot-method and threshold overrides
 
 ## Slash Commands
-- `/autolayer` opens the AutoLayer settings GUI.
-- `/autolayer status` shows the current addon state, layer/segment info, channel status, queue size, and key behavior toggles.
-- `/autolayer stats` shows lifetime layered count plus session counters for matched requests, invites, joins, declines, timeouts, and auto-kicks.
-- `/autolayer req [layers]` sends a layer hop request. If omitted, it requests all layers except the current one.
+
+- `/autolayer`: Open settings
+- `/autolayer status`: Show addon, layer, zone/segment, channel, and queue status
+- `/autolayer stats`: Show lifetime and session statistics
+- `/autolayer req [layers]`: Request specific layers, or all layers except the current one

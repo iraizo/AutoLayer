@@ -1,10 +1,21 @@
 ---@diagnostic disable: inject-field
 
 local addonName, addonTable = ...
+local GetAddOnMetadata = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
+
+local isBurningCrusade = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC
+addonTable.flavor = isBurningCrusade and "bcc" or "classic"
+
+local ADDON_VERSION_FALLBACK = "1.9.6"
+local addonVersion = GetAddOnMetadata(addonName, "Version") or ADDON_VERSION_FALLBACK
+addonTable.version = addonVersion
 
 AutoLayer = LibStub("AceAddon-3.0"):NewAddon("AutoLayer", "AceConsole-3.0", "AceEvent-3.0")
 AceGUI = LibStub("AceGUI-3.0")
 local minimap_icon = LibStub("LibDBIcon-1.0")
+local CTL = _G.ChatThrottleLib
+local ChatFrameAddMessageEventFilter = ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter or ChatFrame_AddMessageEventFilter
+local ChatFrameRemoveMessageEventFilter = ChatFrameUtil and ChatFrameUtil.RemoveMessageEventFilter or ChatFrame_RemoveMessageEventFilter
 
 --- A helper function to ensure the length of a whisper won't exceed
 --- the 255 character limit but after currentLayer value substitution.
@@ -255,7 +266,7 @@ local options = {
 				autokick = {
 					type = "toggle",
 					name = "Auto-Kick on Full",
-					desc = "|cffFF0000Requires manual interaction.|r Kicks the last member if the group is full.",
+					desc = "|cffFF0000Requires manual interaction.|r Queues one offline/oldest candidate when the group is full.",
 					set = function(info, val)
 						AutoLayer.db.profile.autokick = val
 					end,
@@ -300,8 +311,10 @@ local options = {
 				},
 				layerSegments = {
 					type = "toggle",
-					name = "Use Layer Segments",
-					desc = "Only invite players in the same layer segment. (e.g. Azeroth, Outland). This avoids party members not layering due to being in a different area of the world that uses different layers.",
+					name = addonTable.flavor == "bcc" and "Use Zone Filtering" or "Use Layer Segments",
+					desc = addonTable.flavor == "bcc"
+						and "Only invite players in the same zone."
+						or "Only invite players in the same layer segment. (e.g. Azeroth, Outland). This avoids party members not layering due to being in a different area of the world that uses different layers.",
 					set = function(info, val)
 						AutoLayer.db.profile.layerSegments = val
 					end,
@@ -312,8 +325,10 @@ local options = {
 				},
 				showLayerWarning = {
 					type = "toggle",
-					name = "Layer Segment Warning",
-					desc = "Show a warning when joining a party with a different layer segment, while the layer segment feature is enabled.",
+					name = addonTable.flavor == "bcc" and "Layer Zone Warning" or "Layer Segment Warning",
+					desc = addonTable.flavor == "bcc"
+						and "Show a warning when joining a party in a different zone, while zone filtering is enabled."
+						or "Show a warning when joining a party with a different layer segment, while the layer segment feature is enabled.",
 					set = function(info, val)
 						AutoLayer.db.profile.showLayerWarning = val
 					end,
@@ -582,6 +597,117 @@ function AutoLayer:CompareLayerSegments()
 	return playerSegment, leaderSegment
 end 
 
+if addonTable.flavor == "bcc" then
+	local function parseVersion(version)
+		local major, minor, patch = tostring(version or ""):match("^(%d+)%.(%d+)%.(%d+)$")
+		if not major then
+			return nil
+		end
+		return tonumber(major), tonumber(minor), tonumber(patch)
+	end
+
+	function AutoLayer:GetLayerZone(unitID)
+		return tostring(C_Map.GetBestMapForUnit(unitID or "player") or 0)
+	end
+
+	function AutoLayer:GetLayerZoneName(scopeID)
+		local mapInfo = C_Map.GetMapInfo(tonumber(scopeID))
+		if mapInfo and mapInfo.name then
+			return mapInfo.name
+		end
+		return "Unknown zone (" .. tostring(scopeID) .. ")"
+	end
+
+	function AutoLayer:CompareLayerZones()
+		if not self.db.profile.layerSegments then
+			return nil, nil
+		end
+
+		local numGroupMembers = GetNumGroupMembers()
+		if numGroupMembers == 0 then
+			return nil, nil
+		end
+
+		local unitPrefix = IsInRaid() and "raid" or "party"
+		local leaderUnit
+		for i = 1, numGroupMembers do
+			local unitID = unitPrefix .. i
+			if UnitIsGroupLeader(unitID) then
+				leaderUnit = unitID
+				break
+			end
+		end
+
+		if not leaderUnit then
+			return nil, nil
+		end
+
+		local playerZone = addonTable.currentLayerZone or self:GetLayerZone("player")
+		local leaderZone = self:GetLayerZone(leaderUnit)
+		if playerZone == "0" or leaderZone == "0" then
+			return nil, nil
+		end
+
+		return playerZone, leaderZone
+	end
+
+	function AutoLayer:BuildLayerRequestHeader(scopeID)
+		local major, minor, patch = parseVersion(addonVersion)
+		if not major then
+			major, minor, patch = parseVersion(ADDON_VERSION_FALLBACK)
+		end
+		return string.format("<AL2V%d_%d_%dZ%s>", major, minor, patch, tostring(scopeID or 0))
+	end
+
+	function AutoLayer:ParseLayerRequestHeader(message)
+		local protocolVersion, major, minor, patch, scopeID, body = tostring(message or ""):match(
+			"^<AL(%d+)V(%d+)_(%d+)_(%d+)Z(%d+)>(.*)$"
+		)
+		if not protocolVersion or tonumber(protocolVersion) ~= 2 then
+			return nil
+		end
+
+		local metadata = {
+			protocolVersion = tonumber(protocolVersion),
+			addonVersion = string.format("%d.%d.%d", tonumber(major), tonumber(minor), tonumber(patch)),
+			scopeID = tostring(tonumber(scopeID)),
+		}
+		local requestBody = body:gsub("^%s+", "")
+		return metadata, requestBody
+	end
+
+	function AutoLayer:IsVersionOlder(left, right)
+		local leftMajor, leftMinor, leftPatch = parseVersion(left)
+		local rightMajor, rightMinor, rightPatch = parseVersion(right)
+		if not leftMajor then
+			return true
+		end
+		if not rightMajor then
+			return false
+		end
+		if leftMajor ~= rightMajor then
+			return leftMajor < rightMajor
+		end
+		if leftMinor ~= rightMinor then
+			return leftMinor < rightMinor
+		end
+		return leftPatch < rightPatch
+	end
+
+	function AutoLayer:SendLayerCompatibilityWhisper(target)
+		if target and target ~= "" then
+			CTL:SendChatMessage(
+				"NORMAL",
+				target,
+				"[AutoLayer] Please update to AutoLayer 1.9.5 or later to use zone-aware layer invites.",
+				"WHISPER",
+				nil,
+				target
+			)
+		end
+	end
+end
+
 function AutoLayer:IsInMaplessInstance()
 	-- Determine if the player is in a "mapless" instance, which is an instance that does not return a mapID
 	local maplessInstances = {
@@ -638,6 +764,14 @@ local function getCurrentSegmentDisplay()
 		return "off"
 	end
 
+	if addonTable.flavor == "bcc" then
+		local currentZone = addonTable.currentLayerZone or AutoLayer:GetLayerZone()
+		if not currentZone or currentZone == "0" then
+			return "unknown"
+		end
+		return AutoLayer:GetLayerZoneName(currentZone)
+	end
+
 	local currentSegment = addonTable.currentLayerSegment or AutoLayer:GetLayerSegment()
 	if not currentSegment then
 		return "unknown"
@@ -670,7 +804,7 @@ function AutoLayer:SlashCommandStatus()
 	self:Print("Status:")
 	self:Print("State: " .. enabledState)
 	self:Print("Current layer: " .. getCurrentLayerDisplay())
-	self:Print("Layer segment: " .. getCurrentSegmentDisplay())
+	self:Print((addonTable.flavor == "bcc" and "Layer zone: " or "Layer segment: ") .. getCurrentSegmentDisplay())
 	self:Print("Invite authority: " .. getInviteAuthorityDisplay())
 	self:Print("Layer channel: " .. activeChannel)
 
@@ -683,10 +817,13 @@ function AutoLayer:SlashCommandStatus()
 	self:Print(
 		"Flags: guild only "
 			.. formatOnOff(self.db.profile.guildOnly)
-			.. ", auto-kick "
-			.. formatOnOff(self.db.profile.autokick)
 			.. ", mute sounds "
 			.. formatOnOff(self.db.profile.mutesounds)
+	)
+	self:Print(
+		"Auto-kick: "
+			.. formatOnOff(self.db.profile.autokick)
+			.. " (one offline/oldest candidate queued when the group is full)"
 	)
 end
 
@@ -724,9 +861,9 @@ function AutoLayer:OnInitialize()
 	local icon = ""
 
 	if self.db.profile.enabled then
-		icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_enabled_icon]]
+		icon = [[Interface\AddOns\AutoLayer\Textures\AutoLayer_enabled_icon]]
 	else
-		icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_disabled_icon]]
+		icon = [[Interface\AddOns\AutoLayer\Textures\AutoLayer_disabled_icon]]
 	end
 
 	if self.db.profile.enabled and self.db.profile.mutesounds then
@@ -742,7 +879,13 @@ function AutoLayer:OnInitialize()
 	end
 
 	if self.db.profile.layerSegments then
-		addonTable.currentLayerSegment = self:GetLayerSegment()
+		if addonTable.flavor == "bcc" then
+			addonTable.currentLayerZone = self:GetLayerZone()
+		else
+			addonTable.currentLayerSegment = self:GetLayerSegment()
+		end
+	elseif addonTable.flavor == "bcc" then
+		addonTable.currentLayerZone = self:GetLayerZone()
 	end
 
 	---@diagnostic disable-next-line: missing-fields
@@ -781,7 +924,12 @@ function AutoLayer:OnInitialize()
 				end
 			end
 
-			if addonTable.currentLayerSegment then
+			if addonTable.flavor == "bcc" then
+				local currentZone = addonTable.currentLayerZone
+				if currentZone and currentZone ~= "0" then
+					tooltip:AddLine("Layer zone: " .. AutoLayer:GetLayerZoneName(currentZone))
+				end
+			elseif addonTable.currentLayerSegment then
 				tooltip:AddLine("Layer segment: " .. addonTable.layerSegments[addonTable.currentLayerSegment])
 			end
 		end,
@@ -812,10 +960,10 @@ local function whisperInformFilter(self, event, msg, author, ...)
 	return filtered, msg, author, ...
 end
 function AutoLayer:filterChatEventAutoLayerWhisperMessages()
-	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", whisperInformFilter)
+    ChatFrameAddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", whisperInformFilter)
 end
 function AutoLayer:unfilterChatEventAutoLayerWhisperMessages()
-	ChatFrame_RemoveMessageEventFilter("CHAT_MSG_WHISPER_INFORM", whisperInformFilter)
+    ChatFrameRemoveMessageEventFilter("CHAT_MSG_WHISPER_INFORM", whisperInformFilter)
 end
 
 --For hiding group system messages
@@ -824,10 +972,10 @@ local function systemFilter(self, event, msg, author, ...)
 	return filtered, msg, author, ...
 end
 function AutoLayer:filterChatEventSystemGroupMessages()
-	ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", systemFilter)
+    ChatFrameAddMessageEventFilter("CHAT_MSG_SYSTEM", systemFilter)
 end
 function AutoLayer:unfilterChatEventSystemGroupMessages()
-	ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", systemFilter)
+    ChatFrameRemoveMessageEventFilter("CHAT_MSG_SYSTEM", systemFilter)
 end
 
 function AutoLayer:SlashCommand(input)
