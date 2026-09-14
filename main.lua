@@ -724,9 +724,9 @@ function AutoLayer:OnInitialize()
 	local icon = ""
 
 	if self.db.profile.enabled then
-		icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_enabled_icon]]
+		icon = [[Interface\AddOns\AutoLayer\Textures\AutoLayer_enabled_icon]]
 	else
-		icon = [[Interface\AddOns\AutoLayer_Vanilla\Textures\AutoLayer_disabled_icon]]
+		icon = [[Interface\AddOns\AutoLayer\Textures\AutoLayer_disabled_icon]]
 	end
 
 	if self.db.profile.enabled and self.db.profile.mutesounds then
