@@ -5,6 +5,9 @@ local playersInvitedRecently = {}
 local pendingPlayerInvites = {}
 local recentLayerRequests = {}
 local kicked_player_queue = {}
+local queuedKickNames = {}
+local compatibilityNoticeExpiry = {}
+local zoneMismatchNoticeExpiry = {}
 local runtimeStats = {
 	matchedRequests = 0,
 	invitesSent = 0,
@@ -178,6 +181,44 @@ end
 
 local function removeRealmName(name)
 	return ({ strsplit("-", name) })[1]
+end
+
+local function normalizeCharacterName(name)
+	local normalized = removeRealmName(name or "")
+	return string.lower(normalized)
+end
+
+local function sendCompatibilityNoticeOnce(target)
+	local normalized = normalizeCharacterName(target)
+	if normalized == "" then
+		return
+	end
+
+	local currentTime = time()
+	if not compatibilityNoticeExpiry[normalized] or compatibilityNoticeExpiry[normalized] <= currentTime then
+		compatibilityNoticeExpiry[normalized] = currentTime + 300
+		AutoLayer:SendLayerCompatibilityWhisper(target)
+	end
+end
+
+local function sendZoneMismatchNoticeOnce(target)
+	local normalized = normalizeCharacterName(target)
+	if normalized == "" then
+		return
+	end
+
+	local currentTime = time()
+	if not zoneMismatchNoticeExpiry[normalized] or zoneMismatchNoticeExpiry[normalized] <= currentTime then
+		zoneMismatchNoticeExpiry[normalized] = currentTime + 300
+		CTL:SendChatMessage(
+			"NORMAL",
+			target,
+			"[AutoLayer] Layer invites only work within the same zone; no invite was sent.",
+			"WHISPER",
+			nil,
+			target
+		)
+	end
 end
 
 local function stripColorCodes(msg)
@@ -388,21 +429,51 @@ function AutoLayer:ProcessMessage(
 		end
 	end
 
-	-- Check if the message has a layer segment prefix. If it does, it should match our layer segment.
-	local segmentPrefix = msg:match("^<(%w+)> ")
+	if addonTable.flavor == "bcc" then
+		local metadata, body = self:ParseLayerRequestHeader(msg)
+		if not metadata then
+			sendCompatibilityNoticeOnce(name)
+			local legacyPrefix = msg:match("^<(%w+)> ")
+			if legacyPrefix then
+				msg = msg:gsub("^<" .. legacyPrefix .. "> ", "")
+			end
+			if self.db.profile.layerSegments then
+				return
+			end
+		else
+			msg = body
+			if self:IsVersionOlder(metadata.addonVersion, "1.9.5") then
+				sendCompatibilityNoticeOnce(name)
+				if self.db.profile.layerSegments then
+					return
+				end
+			end
 
-	-- Remove the matched prefix from msg, since it could inadvertently trigger things like blacklist or invert keywords
-	if segmentPrefix then
-		msg = msg:gsub("^<" .. segmentPrefix .. "> ", "")
-	end
+			if self.db.profile.layerSegments then
+				local playerZone = addonTable.currentLayerZone or self:GetLayerZone()
+				if playerZone ~= "0" and metadata.scopeID ~= "0" and playerZone ~= metadata.scopeID then
+					sendZoneMismatchNoticeOnce(name)
+					return
+				end
+			end
+		end
+	else
+		-- Check if the message has a layer segment prefix. If it does, it should match our layer segment.
+		local segmentPrefix = msg:match("^<(%w+)> ")
 
-	if self.db.profile.layerSegments and addonTable.currentLayerSegment and segmentPrefix then
-		if segmentPrefix ~= addonTable.currentLayerSegment then
-			self:DebugPrint("Message has segment prefix " .. segmentPrefix .. " but we are in segment '" .. addonTable.currentLayerSegment .. "', ignoring")
-			return
+		-- Remove the matched prefix from msg, since it could inadvertently trigger things like blacklist or invert keywords
+		if segmentPrefix then
+			msg = msg:gsub("^<" .. segmentPrefix .. "> ", "")
 		end
 
-		self:DebugPrint("Message segment prefix " .. segmentPrefix .. " matches our segment")
+		if self.db.profile.layerSegments and addonTable.currentLayerSegment and segmentPrefix then
+			if segmentPrefix ~= addonTable.currentLayerSegment then
+				self:DebugPrint("Message has segment prefix " .. segmentPrefix .. " but we are in segment '" .. addonTable.currentLayerSegment .. "', ignoring")
+				return
+			end
+
+			self:DebugPrint("Message segment prefix " .. segmentPrefix .. " matches our segment")
+		end
 	end
 
 	local name_without_realm = removeRealmName(name)
@@ -716,12 +787,13 @@ function AutoLayer:HandleAutoKick()
 		return
 	end
 
-	if self.db.profile.autokick and #kicked_player_queue >= 0 then
+	if self.db.profile.autokick and #kicked_player_queue > 0 then
 		local name = table.remove(kicked_player_queue, 1)
 
 		if name == nil then
 			return
 		end
+		queuedKickNames[normalizeCharacterName(name)] = nil
 
 		if not UnitInRaid(name) and not UnitInParty(name) then
 			return
@@ -738,6 +810,12 @@ function AutoLayer:ProcessRosterUpdate()
 end
 
 function AutoLayer:ProcessZoneChange()
+	if addonTable.flavor == "bcc" then
+		addonTable.currentLayerZone = self:GetLayerZone()
+		self:DebugPrint("Current layer zone set to:", addonTable.currentLayerZone)
+		return
+	end
+
 	if self.db.profile.layerSegments then
 		local layer_segment = self:GetLayerSegment()
 		
@@ -753,8 +831,65 @@ function AutoLayer:ProcessZoneChange()
 		end
 	end
 end
+local LeaveParty = C_PartyInfo and C_PartyInfo.LeaveParty or LeaveParty
+
+local function findGroupLeaderUnit()
+	local unitPrefix = IsInRaid() and "raid" or "party"
+	for i = 1, GetNumGroupMembers() do
+		local unitID = unitPrefix .. i
+		if UnitIsGroupLeader(unitID) then
+			return unitID
+		end
+	end
+end
 
 function AutoLayer:ProcessGroupJoined()
+	if addonTable.flavor == "bcc" then
+		if not self.db.profile.layerSegments or UnitIsGroupLeader("player") then
+			return
+		end
+
+		local pendingLayerHop = addonTable.pendingLayerHop
+		if pendingLayerHop and pendingLayerHop.sentAt + 300 < time() then
+			addonTable.pendingLayerHop = nil
+			pendingLayerHop = nil
+		end
+
+		if not pendingLayerHop and not self.db.profile.showLayerWarning then
+			return
+		end
+
+		self:DebugPrint("Group joined, comparing layer zones with leader...")
+		C_Timer.After(2, function()
+			local activePendingHop = pendingLayerHop and addonTable.pendingLayerHop == pendingLayerHop
+			local playerZone, leaderZone = AutoLayer:CompareLayerZones()
+			local leaderUnit = findGroupLeaderUnit()
+
+			if activePendingHop and playerZone and leaderZone and playerZone ~= leaderZone then
+				LeaveParty()
+				addonTable.pendingLayerHop = nil
+				if leaderUnit then
+					sendCompatibilityNoticeOnce(UnitName(leaderUnit))
+				end
+				return
+			end
+
+			if activePendingHop and playerZone and leaderZone then
+				addonTable.pendingLayerHop = nil
+				return
+			end
+
+			if self.db.profile.showLayerWarning and leaderUnit then
+				local currentZone = AutoLayer:GetLayerZone()
+				local currentLeaderZone = AutoLayer:GetLayerZone(leaderUnit)
+				self:Print("|cffffff00WARNING:|r You are in " .. AutoLayer:GetLayerZoneName(currentZone) ..
+					", while the party leader is in " .. AutoLayer:GetLayerZoneName(currentLeaderZone) ..
+					". You will most likely not layer correctly. You can leave the party and try to layer again.")
+			end
+		end)
+		return
+	end
+
 	if self.db.profile.layerSegments and self.db.profile.showLayerWarning and not UnitIsGroupLeader("player") then
 		self:DebugPrint("Group joined, comparing layer segments with leader...")
 		-- Grant the game a little bit of time to process the group join and update any relevant information before we compare segments
