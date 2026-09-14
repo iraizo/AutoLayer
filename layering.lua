@@ -3,6 +3,7 @@ local CTL = _G.ChatThrottleLib
 
 local playersInvitedRecently = {}
 local pendingPlayerInvites = {}
+local groupInviteTimes = {}
 local recentLayerRequests = {}
 local kicked_player_queue = {}
 local queuedKickNames = {}
@@ -385,13 +386,52 @@ C_Timer.After(0.1, function()
 	FixMisplacedChannels()
 end)
 
-function AutoLayer:FindOfflineMembersToKick()
-	for i = 1, GetNumGroupMembers() do
-		local name, _, _, _, _, _, _, online, _, _, _, _ = GetRaidRosterInfo(i)
+function AutoLayer:SelectKickCandidate()
+	local playerName = normalizeCharacterName(UnitName("player"))
+	local oldestName
+	local oldestTime
+	local oldestIndex
 
-		if online == false then
-			table.insert(kicked_player_queue, name)
+	for i = 1, GetNumGroupMembers() do
+		local name, _, _, _, _, _, _, online = GetRaidRosterInfo(i)
+		local normalizedName = name and normalizeCharacterName(name)
+
+		if name and normalizedName ~= playerName then
+			if online == false then
+				return name
+			end
+
+			local inviteTime = groupInviteTimes[normalizedName]
+			if not oldestName
+				or (inviteTime and not oldestTime)
+				or (inviteTime and oldestTime and inviteTime < oldestTime)
+				or ((not inviteTime and not oldestTime) or (inviteTime and oldestTime and inviteTime == oldestTime))
+					and i < oldestIndex
+			then
+				oldestName = name
+				oldestTime = inviteTime
+				oldestIndex = i
+			end
 		end
+	end
+
+	return oldestName
+end
+
+local function queueKickCandidate(name)
+	local normalizedName = normalizeCharacterName(name)
+	if normalizedName == "" or queuedKickNames[normalizedName] then
+		return
+	end
+
+	queuedKickNames[normalizedName] = true
+	groupInviteTimes[normalizedName] = nil
+	table.insert(kicked_player_queue, name)
+end
+
+local function clearGroupInviteTimes()
+	for name in pairs(groupInviteTimes) do
+		groupInviteTimes[name] = nil
 	end
 end
 
@@ -648,20 +688,24 @@ function AutoLayer:ProcessMessage(
 	table.insert(recentLayerRequests, { name = name_without_realm, time = time() })
 	self:DebugPrint("Added", name_without_realm, "to list of recent layer requests")
 
-	-- check if group is full
+	-- Check if group is full
 	if self.db.profile.autokick and GetNumGroupMembers() == max_group_size then
-		self:DebugPrint("Group is full, kicking")
-
-		-- kick last member of raid
-		local lastMember = GetRaidRosterInfo(GetNumGroupMembers())
-		table.insert(kicked_player_queue, lastMember)
-
+		local candidate = self:SelectKickCandidate()
+		if candidate then
+			self:DebugPrint("Group is full, queueing", candidate, "for manual kick")
+			queueKickCandidate(candidate)
+		end
 		return
 	end
 end
 
 ---@diagnostic disable-next-line: inject-field
 function AutoLayer:ProcessSystemMessages(_, SystemMessages)
+	if SystemMessages == ERR_GROUP_DISBANDED or SystemMessages == ERR_LEFT_GROUP_YOU then
+		clearGroupInviteTimes()
+	elseif SystemMessages:match("^" .. ERR_LEFT_GROUP_S:format("(.+)")) then
+		clearGroupInviteTimes()
+	end
 	if not self.db.profile.enabled then
 		return
 	end
@@ -681,14 +725,17 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 				break -- Found the player, no need to continue checking
 			end
 		end
-		-- Player accepted invite, remove from pending invites
+		-- Player accepted invite, transfer its timestamp and remove it from pending invites.
+		local inviteTimestamp = time()
 		for i, entry in ipairs(pendingPlayerInvites) do
 			if entry.name == playerNameWithoutRealm then
+				inviteTimestamp = entry.time or inviteTimestamp
 				self:DebugPrint("Removing ", playerNameWithoutRealm, " from pending invites, reason: accepted invite")
 				table.remove(pendingPlayerInvites, i)
 				break -- Found the player, no need to continue checking
 			end
 		end
+		groupInviteTimes[normalizeCharacterName(playerNameWithoutRealm)] = inviteTimestamp
 		-- Ensure group loot is set as desired
 		if self.db.profile.overrideLootSettings and UnitIsGroupLeader("player") then
 			local lootMethod, _, _ = C_PartyInfo.GetLootMethod()

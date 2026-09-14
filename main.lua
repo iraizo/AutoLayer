@@ -263,7 +263,7 @@ local options = {
 				autokick = {
 					type = "toggle",
 					name = "Auto-Kick on Full",
-					desc = "|cffFF0000Requires manual interaction.|r Kicks the last member if the group is full.",
+					desc = "|cffFF0000Requires manual interaction.|r Queues one offline/oldest candidate when the group is full.",
 					set = function(info, val)
 						AutoLayer.db.profile.autokick = val
 					end,
@@ -814,10 +814,13 @@ function AutoLayer:SlashCommandStatus()
 	self:Print(
 		"Flags: guild only "
 			.. formatOnOff(self.db.profile.guildOnly)
-			.. ", auto-kick "
-			.. formatOnOff(self.db.profile.autokick)
 			.. ", mute sounds "
 			.. formatOnOff(self.db.profile.mutesounds)
+	)
+	self:Print(
+		"Auto-kick: "
+			.. formatOnOff(self.db.profile.autokick)
+			.. " (one offline/oldest candidate queued when the group is full)"
 	)
 end
 
