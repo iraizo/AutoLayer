@@ -25,6 +25,33 @@ addonTable.activeLayerChannel = nil
 -- Channel list - will be populated after all addons load
 local LAYER_CHANNELS = {}
 
+if not C_Seasons then
+    C_Seasons = {}
+end
+if not C_Seasons.HasActiveSeason then
+    C_Seasons.HasActiveSeason = function()
+        return false
+    end
+end
+local UninviteUnit = (C_PartyInfo and C_PartyInfo.UninviteUnit) or _G.UninviteUnit
+
+local function getCurrentCalendarTime()
+    if C_DateAndTime and C_DateAndTime.GetCurrentCalendarTime then
+        return C_DateAndTime.GetCurrentCalendarTime()
+    elseif C_DateAndTime and C_DateAndTime.GetTodaysDate then
+        local today = C_DateAndTime.GetTodaysDate()
+        return {
+            monthDay = today.day,
+            month = today.month,
+            year = today.year,
+            weekday = today.weekDay,
+            hour = 0,
+            minute = 0,
+        }
+    end
+    error("AutoLayer tried to call a Blizzard API function that does not exist...", 2)
+end
+
 -- Generate dynamic channel names based on server date and realm name
 local function GenerateLayerChannels()
 	local channels = {}
@@ -32,7 +59,7 @@ local function GenerateLayerChannels()
 	-- Always include the static "layer" channel first as primary/fallback
 	table.insert(channels, "layer")
 
-	local t = C_DateAndTime.GetCurrentCalendarTime()
+    local t = getCurrentCalendarTime()
 	local realmName = GetRealmName() or "Unknown"
 
 	-- Need LibDeflate for hashing

@@ -1,6 +1,7 @@
 ---@diagnostic disable: inject-field
 
 local addonName, addonTable = ...
+local GetAddOnMetadata = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
 
 local isBurningCrusade = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC
 addonTable.flavor = isBurningCrusade and "bcc" or "classic"
@@ -13,6 +14,8 @@ AutoLayer = LibStub("AceAddon-3.0"):NewAddon("AutoLayer", "AceConsole-3.0", "Ace
 AceGUI = LibStub("AceGUI-3.0")
 local minimap_icon = LibStub("LibDBIcon-1.0")
 local CTL = _G.ChatThrottleLib
+local ChatFrameAddMessageEventFilter = ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter or ChatFrame_AddMessageEventFilter
+local ChatFrameRemoveMessageEventFilter = ChatFrameUtil and ChatFrameUtil.RemoveMessageEventFilter or ChatFrame_RemoveMessageEventFilter
 
 --- A helper function to ensure the length of a whisper won't exceed
 --- the 255 character limit but after currentLayer value substitution.
@@ -957,10 +960,10 @@ local function whisperInformFilter(self, event, msg, author, ...)
 	return filtered, msg, author, ...
 end
 function AutoLayer:filterChatEventAutoLayerWhisperMessages()
-	ChatFrame_AddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", whisperInformFilter)
+    ChatFrameAddMessageEventFilter("CHAT_MSG_WHISPER_INFORM", whisperInformFilter)
 end
 function AutoLayer:unfilterChatEventAutoLayerWhisperMessages()
-	ChatFrame_RemoveMessageEventFilter("CHAT_MSG_WHISPER_INFORM", whisperInformFilter)
+    ChatFrameRemoveMessageEventFilter("CHAT_MSG_WHISPER_INFORM", whisperInformFilter)
 end
 
 --For hiding group system messages
@@ -969,10 +972,10 @@ local function systemFilter(self, event, msg, author, ...)
 	return filtered, msg, author, ...
 end
 function AutoLayer:filterChatEventSystemGroupMessages()
-	ChatFrame_AddMessageEventFilter("CHAT_MSG_SYSTEM", systemFilter)
+    ChatFrameAddMessageEventFilter("CHAT_MSG_SYSTEM", systemFilter)
 end
 function AutoLayer:unfilterChatEventSystemGroupMessages()
-	ChatFrame_RemoveMessageEventFilter("CHAT_MSG_SYSTEM", systemFilter)
+    ChatFrameRemoveMessageEventFilter("CHAT_MSG_SYSTEM", systemFilter)
 end
 
 function AutoLayer:SlashCommand(input)
