@@ -597,79 +597,114 @@ function AutoLayer:CompareLayerSegments()
 	return playerSegment, leaderSegment
 end 
 
-local needsCompatibilityNotice = false
-
 if addonTable.flavor == "bcc" then
-	local metadata, body = self:ParseLayerRequestHeader(msg)
-
-	if not metadata then
-		-- This may be an old AutoLayer client, but DON'T whisper them yet.
-		-- First make sure their message is actually a layer request.
-		needsCompatibilityNotice = true
-
-		local legacyPrefix = msg:match("^<(%w+)> ")
-		if legacyPrefix then
-			msg = msg:gsub("^<" .. legacyPrefix .. "> ", "")
+	local function parseVersion(version)
+		local major, minor, patch = tostring(version or ""):match("^(%d+)%.(%d+)%.(%d+)$")
+		if not major then
+			return nil
 		end
-	else
-		msg = body
+		return tonumber(major), tonumber(minor), tonumber(patch)
+	end
 
-		if self:IsVersionOlder(metadata.addonVersion, "1.9.5") then
-			-- Old AutoLayer version. Delay the warning until after
-			-- we've confirmed this is actually a layer request.
-			needsCompatibilityNotice = true
+	function AutoLayer:GetLayerZone(unitID)
+		return tostring(C_Map.GetBestMapForUnit(unitID or "player") or 0)
+	end
+
+	function AutoLayer:GetLayerZoneName(scopeID)
+		local mapInfo = C_Map.GetMapInfo(tonumber(scopeID))
+		if mapInfo and mapInfo.name then
+			return mapInfo.name
+		end
+		return "Unknown zone (" .. tostring(scopeID) .. ")"
+	end
+
+	function AutoLayer:CompareLayerZones()
+		if not self.db.profile.layerSegments then
+			return nil, nil
 		end
 
-		if self.db.profile.layerSegments then
-			local playerZone = addonTable.currentLayerZone or self:GetLayerZone()
+		local numGroupMembers = GetNumGroupMembers()
+		if numGroupMembers == 0 then
+			return nil, nil
+		end
 
-			if playerZone ~= "0"
-				and metadata.scopeID ~= "0"
-				and playerZone ~= metadata.scopeID
-			then
-				sendZoneMismatchNoticeOnce(name)
-				return
+		local unitPrefix = IsInRaid() and "raid" or "party"
+		local leaderUnit
+		for i = 1, numGroupMembers do
+			local unitID = unitPrefix .. i
+			if UnitIsGroupLeader(unitID) then
+				leaderUnit = unitID
+				break
 			end
 		end
-	end
-else
-	-- Check if the message has a layer segment prefix.
-	local segmentPrefix = msg:match("^<(%w+)> ")
 
-	-- Remove the matched prefix from msg, since it could inadvertently
-	-- trigger blacklist or invert keywords.
-	if segmentPrefix then
-		msg = msg:gsub("^<" .. segmentPrefix .. "> ", "")
-	end
-
-	if self.db.profile.layerSegments and addonTable.currentLayerSegment and segmentPrefix then
-		if segmentPrefix ~= addonTable.currentLayerSegment then
-			self:DebugPrint(
-				"Message has segment prefix "
-					.. segmentPrefix
-					.. " but we are in segment '"
-					.. addonTable.currentLayerSegment
-					.. "', ignoring"
-			)
-			return
+		if not leaderUnit then
+			return nil, nil
 		end
 
-		self:DebugPrint(
-			"Message segment prefix "
-				.. segmentPrefix
-				.. " matches our segment"
-		)
+		local playerZone = addonTable.currentLayerZone or self:GetLayerZone("player")
+		local leaderZone = self:GetLayerZone(leaderUnit)
+		if playerZone == "0" or leaderZone == "0" then
+			return nil, nil
+		end
+
+		return playerZone, leaderZone
 	end
-end
 
--- Only now tell somebody they need to update AutoLayer.
-if addonTable.flavor == "bcc" and needsCompatibilityNotice then
-	sendCompatibilityNoticeOnce(name)
+	function AutoLayer:BuildLayerRequestHeader(scopeID)
+		local major, minor, patch = parseVersion(addonVersion)
+		if not major then
+			major, minor, patch = parseVersion(ADDON_VERSION_FALLBACK)
+		end
+		return string.format("<AL2V%d_%d_%dZ%s>", major, minor, patch, tostring(scopeID or 0))
+	end
 
-	-- Zone filtering requires the new protocol, so don't process
-	-- the request further if zone filtering is enabled.
-	if self.db.profile.layerSegments then
-		return
+	function AutoLayer:ParseLayerRequestHeader(message)
+		local protocolVersion, major, minor, patch, scopeID, body = tostring(message or ""):match(
+			"^<AL(%d+)V(%d+)_(%d+)_(%d+)Z(%d+)>(.*)$"
+		)
+		if not protocolVersion or tonumber(protocolVersion) ~= 2 then
+			return nil
+		end
+
+		local metadata = {
+			protocolVersion = tonumber(protocolVersion),
+			addonVersion = string.format("%d.%d.%d", tonumber(major), tonumber(minor), tonumber(patch)),
+			scopeID = tostring(tonumber(scopeID)),
+		}
+		local requestBody = body:gsub("^%s+", "")
+		return metadata, requestBody
+	end
+
+	function AutoLayer:IsVersionOlder(left, right)
+		local leftMajor, leftMinor, leftPatch = parseVersion(left)
+		local rightMajor, rightMinor, rightPatch = parseVersion(right)
+		if not leftMajor then
+			return true
+		end
+		if not rightMajor then
+			return false
+		end
+		if leftMajor ~= rightMajor then
+			return leftMajor < rightMajor
+		end
+		if leftMinor ~= rightMinor then
+			return leftMinor < rightMinor
+		end
+		return leftPatch < rightPatch
+	end
+
+	function AutoLayer:SendLayerCompatibilityWhisper(target)
+		if target and target ~= "" then
+			CTL:SendChatMessage(
+				"NORMAL",
+				target,
+				"[AutoLayer] Please update to AutoLayer 1.9.5 or later to use zone-aware layer invites.",
+				"WHISPER",
+				nil,
+				target
+			)
+		end
 	end
 end
 

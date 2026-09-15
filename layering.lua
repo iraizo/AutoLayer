@@ -496,24 +496,24 @@ function AutoLayer:ProcessMessage(
 		end
 	end
 
+	local needsCompatibilityNotice = false
+
 	if addonTable.flavor == "bcc" then
 		local metadata, body = self:ParseLayerRequestHeader(msg)
 		if not metadata then
-			sendCompatibilityNoticeOnce(name)
+			-- This may be an old AutoLayer client, but do not whisper them until
+			-- their message has been confirmed as an actual layer request.
+			needsCompatibilityNotice = true
+
 			local legacyPrefix = msg:match("^<(%w+)> ")
 			if legacyPrefix then
 				msg = msg:gsub("^<" .. legacyPrefix .. "> ", "")
 			end
-			if self.db.profile.layerSegments then
-				return
-			end
 		else
 			msg = body
 			if self:IsVersionOlder(metadata.addonVersion, "1.9.5") then
-				sendCompatibilityNoticeOnce(name)
-				if self.db.profile.layerSegments then
-					return
-				end
+				-- Delay the warning until after the layer trigger check.
+				needsCompatibilityNotice = true
 			end
 
 			if self.db.profile.layerSegments then
@@ -551,6 +551,16 @@ function AutoLayer:ProcessMessage(
 	local triggerMatch = containsAnyTriggersFromList(msg, AutoLayer:ParseTriggers())
 	if not triggerMatch then
 		return
+	end
+
+	-- Only warn incompatible BCC clients after confirming this is a layer request.
+	if addonTable.flavor == "bcc" and needsCompatibilityNotice then
+		sendCompatibilityNoticeOnce(name)
+
+		-- Zone filtering requires the current request-header protocol.
+		if self.db.profile.layerSegments then
+			return
+		end
 	end
 
 	local blacklistMatch = containsAnyWordFromList(msg, AutoLayer:ParseBlacklist(), false)
