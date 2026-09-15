@@ -8,6 +8,8 @@ local recentLayerRequests = {}
 local kicked_player_queue = {}
 local queuedKickNames = {}
 local compatibilityNoticeExpiry = {}
+local pendingCompatibilityNotices = {}
+local nextCompatibilityNoticeToken = 0
 local zoneMismatchNoticeExpiry = {}
 local runtimeStats = {
 	matchedRequests = 0,
@@ -34,6 +36,11 @@ if not C_Seasons.HasActiveSeason then
     end
 end
 local UninviteUnit = (C_PartyInfo and C_PartyInfo.UninviteUnit) or _G.UninviteUnit
+
+-- ERR_RAID_MEMBER_ADDED_S is missing on some clients the addon supports; when absent, raid
+-- joins reuse the party join message. The pending compatibility notice is consumed on first
+-- match, so a shared string cannot deliver the notice twice.
+local ERR_RAID_MEMBER_ADDED = _G.ERR_RAID_MEMBER_ADDED_S or ERR_JOINED_GROUP_S
 
 local function getCurrentCalendarTime()
     if C_DateAndTime and C_DateAndTime.GetCurrentCalendarTime then
@@ -216,6 +223,20 @@ local function normalizeCharacterName(name)
 	return string.lower(normalized)
 end
 
+local function queueCompatibilityNoticeForInvite(target)
+	local normalized = normalizeCharacterName(target)
+	if normalized ~= "" then
+		nextCompatibilityNoticeToken = nextCompatibilityNoticeToken + 1
+		local token = nextCompatibilityNoticeToken
+		pendingCompatibilityNotices[normalized] = token
+		C_Timer.After(180, function()
+			if pendingCompatibilityNotices[normalized] == token then
+				pendingCompatibilityNotices[normalized] = nil
+			end
+		end)
+	end
+end
+
 local function sendCompatibilityNoticeOnce(target)
 	local normalized = normalizeCharacterName(target)
 	if normalized == "" then
@@ -226,6 +247,20 @@ local function sendCompatibilityNoticeOnce(target)
 	if not compatibilityNoticeExpiry[normalized] or compatibilityNoticeExpiry[normalized] <= currentTime then
 		compatibilityNoticeExpiry[normalized] = currentTime + 300
 		AutoLayer:SendLayerCompatibilityWhisper(target)
+	end
+end
+
+--- Consumes the pending compatibility notice for the given character, if one was queued for
+--- their invite, and delivers it through sendCompatibilityNoticeOnce (which applies its own
+--- throttle). Shared by accepted party (ERR_JOINED_GROUP_S) and raid (ERR_RAID_MEMBER_ADDED)
+--- joins so the notice is delivered when either invite type is accepted.
+--- @param characterName string The character name as it appeared in the join system message.
+local function deliverPendingCompatibilityNotice(characterName)
+	local normalizedPlayerName = normalizeCharacterName(characterName)
+	local compatibilityNoticeToken = pendingCompatibilityNotices[normalizedPlayerName]
+	pendingCompatibilityNotices[normalizedPlayerName] = nil
+	if compatibilityNoticeToken then
+		sendCompatibilityNoticeOnce(characterName)
 	end
 end
 
@@ -496,33 +531,24 @@ function AutoLayer:ProcessMessage(
 		end
 	end
 
+	local bccMetadata
+	local bccRequiresCompatibilityHandling = false
+	local bccShouldNotifyCompatibility = false
+
 	if addonTable.flavor == "bcc" then
-		local metadata, body = self:ParseLayerRequestHeader(msg)
-		if not metadata then
-			sendCompatibilityNoticeOnce(name)
+		local bccBody
+		bccMetadata, bccBody = self:ParseLayerRequestHeader(msg)
+		if not bccMetadata then
+			bccRequiresCompatibilityHandling = true
 			local legacyPrefix = msg:match("^<(%w+)> ")
 			if legacyPrefix then
 				msg = msg:gsub("^<" .. legacyPrefix .. "> ", "")
 			end
-			if self.db.profile.layerSegments then
-				return
-			end
+			bccShouldNotifyCompatibility = string.match(string.lower(msg), "^inv%s+layer%f[%W]") ~= nil
 		else
-			msg = body
-			if self:IsVersionOlder(metadata.addonVersion, "1.9.5") then
-				sendCompatibilityNoticeOnce(name)
-				if self.db.profile.layerSegments then
-					return
-				end
-			end
-
-			if self.db.profile.layerSegments then
-				local playerZone = addonTable.currentLayerZone or self:GetLayerZone()
-				if playerZone ~= "0" and metadata.scopeID ~= "0" and playerZone ~= metadata.scopeID then
-					sendZoneMismatchNoticeOnce(name)
-					return
-				end
-			end
+			msg = bccBody
+			bccRequiresCompatibilityHandling = self:IsVersionOlder(bccMetadata.addonVersion, "1.9.5")
+			bccShouldNotifyCompatibility = bccRequiresCompatibilityHandling
 		end
 	else
 		-- Check if the message has a layer segment prefix. If it does, it should match our layer segment.
@@ -588,12 +614,26 @@ function AutoLayer:ProcessMessage(
 				"Matched excluded request from player: '",
 				name,
 				"' in excluded channel: '",
-				exclusiveChannelMatch,
+				channelBaseName,
 				"' from list of excluded channels: '",
 				AutoLayer:GetFilteredChannels(),
 				"'"
 			)
 			return
+		end
+	end
+
+	if addonTable.flavor == "bcc" then
+		if bccRequiresCompatibilityHandling and self.db.profile.layerSegments then
+			return
+		end
+
+		if bccMetadata and self.db.profile.layerSegments then
+			local playerZone = addonTable.currentLayerZone or self:GetLayerZone()
+			if playerZone ~= "0" and bccMetadata.scopeID ~= "0" and playerZone ~= bccMetadata.scopeID then
+				sendZoneMismatchNoticeOnce(name)
+				return
+			end
 		end
 	end
 
@@ -686,6 +726,20 @@ function AutoLayer:ProcessMessage(
 	-- since those do not exist on anniversary servers and where HasActiveSeason() is true
 	-- we can validate it like this for now.
 	local isSeasonal = C_Seasons.HasActiveSeason()
+	local shouldNotifyCompatibilityOnInvite = addonTable.flavor == "bcc"
+		and bccRequiresCompatibilityHandling
+		and bccShouldNotifyCompatibility
+
+	local function invitePlayer()
+		if shouldNotifyCompatibilityOnInvite then
+			queueCompatibilityNoticeForInvite(name)
+		end
+		if isSeasonal then
+			C_PartyInfo.InviteUnit(name_without_realm)
+		else
+			C_PartyInfo.InviteUnit(name)
+		end
+	end
 
 	---@diagnostic disable-next-line: undefined-global
 	if (GetNumGroupMembers() + #pendingPlayerInvites) <= max_group_size then
@@ -694,19 +748,9 @@ function AutoLayer:ProcessMessage(
 			self:DebugPrint(
 				"Auto-whisper is turned off or we can't provide a helpful whisper, delaying our invite by 500 miliseconds"
 			)
-			C_Timer.After(0.5, function()
-				if isSeasonal then
-					C_PartyInfo.InviteUnit(name_without_realm)
-				else
-					C_PartyInfo.InviteUnit(name)
-				end
-			end)
+			C_Timer.After(0.5, invitePlayer)
 		else
-			if isSeasonal then
-				C_PartyInfo.InviteUnit(name_without_realm)
-			else
-				C_PartyInfo.InviteUnit(name)
-			end
+			invitePlayer()
 		end
 	else
 		self:DebugPrint("Group is already full (", GetNumGroupMembers(), "in group +", #pendingPlayerInvites, "pending invites). Cannot invite", name_without_realm)
@@ -763,6 +807,7 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 			end
 		end
 		groupInviteTimes[normalizeCharacterName(playerNameWithoutRealm)] = inviteTimestamp
+		deliverPendingCompatibilityNotice(characterName)
 		-- Ensure group loot is set as desired
 		if self.db.profile.overrideLootSettings and UnitIsGroupLeader("player") then
 			local lootMethod, _, _ = C_PartyInfo.GetLootMethod()
@@ -777,6 +822,14 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 				SetLootThreshold(self.db.profile.lootThreshold)
 			end
 		end
+	end
+
+	characterName = SystemMessages:match("^" .. ERR_RAID_MEMBER_ADDED:format("(.+)"))
+	-- X joins the raid
+	if characterName then
+		local playerNameWithoutRealm = removeRealmName(characterName)
+		self:DebugPrint("ERR_RAID_MEMBER_ADDED", playerNameWithoutRealm, "found !")
+		deliverPendingCompatibilityNotice(characterName)
 	end
 
 	characterName = SystemMessages:match("^" .. ERR_DECLINE_GROUP_S:format("(.+)"))
@@ -796,6 +849,7 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 				break -- Found the player, no need to continue checking
 			end
 		end
+		pendingCompatibilityNotices[normalizeCharacterName(playerNameWithoutRealm)] = nil
 	end
 
 	characterName = SystemMessages:match("^" .. ERR_INVITE_PLAYER_S:format("(.+)"))
