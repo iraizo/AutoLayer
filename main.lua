@@ -6,7 +6,7 @@ local GetAddOnMetadata = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetad
 local isBurningCrusade = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC
 addonTable.flavor = isBurningCrusade and "bcc" or "classic"
 
-local ADDON_VERSION_FALLBACK = "1.9.6"
+local ADDON_VERSION_FALLBACK = "1.9.8"
 local addonVersion = GetAddOnMetadata(addonName, "Version") or ADDON_VERSION_FALLBACK
 addonTable.version = addonVersion
 
