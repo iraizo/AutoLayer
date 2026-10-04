@@ -265,7 +265,12 @@ local function deliverPendingCompatibilityNotice(characterName)
 end
 
 local function sendZoneMismatchNoticeOnce(target)
+	if not AutoLayer.db.profile.zoneMismatchWhisper then
+		return
+	end
+
 	local normalized = normalizeCharacterName(target)
+
 	if normalized == "" then
 		return
 	end

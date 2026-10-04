@@ -6,7 +6,7 @@ local GetAddOnMetadata = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetad
 local isBurningCrusade = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC
 addonTable.flavor = isBurningCrusade and "bcc" or "classic"
 
-local ADDON_VERSION_FALLBACK = "1.9.8"
+local ADDON_VERSION_FALLBACK = "1.9.9"
 local addonVersion = GetAddOnMetadata(addonName, "Version") or ADDON_VERSION_FALLBACK
 addonTable.version = addonVersion
 
@@ -340,6 +340,24 @@ local options = {
 					end,
 					order = 7,
 				},
+				zoneMismatchWhisper = {
+					type = "toggle",
+					name = "Whisper on Zone Mismatch",
+					desc = "Whisper a requester when zone filtering prevents an invite.",
+					set = function(info, val)
+						AutoLayer.db.profile.zoneMismatchWhisper = val
+					end,
+					get = function(info)
+						return AutoLayer.db.profile.zoneMismatchWhisper
+					end,
+					order = 8,
+					hidden = function()
+						return addonTable.flavor ~= "bcc"
+					end,
+					disabled = function()
+						return not AutoLayer.db.profile.layerSegments
+					end,
+				},
 			},
 		},
 		loot = {
@@ -427,6 +445,7 @@ local defaults = {
 		autokick = false,
 		turnOffWhileRaidAssist = true,
 		layerSegments = true,
+		zoneMismatchWhisper = false,
 		showLayerWarning = true,
 	},
 }
