@@ -1,8 +1,8 @@
 ## Interface: 11508, 11509
 ## Title: AutoLayer
-## Notes: Automatically invites people that want to layer switch
+## Notes: Automatically invites players who want to switch layers
 ## Author: raizo
-## Version: 1.9.9
+## Version: 1.9.10
 ## SavedVariables: AutoLayerDB
 
 embeds.xml
