@@ -975,12 +975,14 @@ function AutoLayer:OnInitialize()
 end
 
 function AutoLayer:MuteAnnoyingSounds()
+	if not MuteSoundFile then return end -- missing on Forever
 	for _, soundFileId in pairs(annoyingSounds) do
 		MuteSoundFile(soundFileId)
 	end
 end
 
 function AutoLayer:UnmuteAnnoyingSounds()
+	if not UnmuteSoundFile then return end -- missing on Forever
 	for _, soundFileId in pairs(annoyingSounds) do
 		UnmuteSoundFile(soundFileId)
 	end

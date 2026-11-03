@@ -800,9 +800,11 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 				C_PartyInfo.SetLootMethod(self.db.profile.lootMethod)
 			end
 
-			if self.db.profile.lootMethod == 3 and GetLootThreshold() ~= self.db.profile.lootThreshold then
-				self:DebugPrint("Setting loot threshold to", self.db.profile.lootThreshold)
-				SetLootThreshold(self.db.profile.lootThreshold)
+			if GetLootThreshold and SetLootThreshold then
+				if self.db.profile.lootMethod == 3 and GetLootThreshold() ~= self.db.profile.lootThreshold then
+					self:DebugPrint("Setting loot threshold to", self.db.profile.lootThreshold)
+					SetLootThreshold(self.db.profile.lootThreshold)
+				end
 			end
 		end
 	end
@@ -1032,7 +1034,11 @@ function JoinLayerChannel()
 			local channel_num = GetChannelName(channelName)
 			if channel_num == 0 then
 				AutoLayer:DebugPrint("Attempting to join '" .. channelName .. "'")
-				JoinChannelByName(channelName)
+				if JoinChannelByName then
+					JoinChannelByName(channelName)
+				else
+					JoinPermanentChannel(channelName, nil, DEFAULT_CHAT_FRAME:GetID(), 1)
+				end
 			end
 		else
 			AutoLayer:DebugPrint("Channel '" .. channelName .. "' skipped (previously failed to join)")

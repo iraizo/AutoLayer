@@ -58,7 +58,13 @@
         "ERR_RAID_MEMBER_ADDED_S",
         "ChatFrameUtil",
         "Constants",
-        "issecretvalue"
+        "issecretvalue",
+        "JoinChannelByName",
+        "JoinPermanentChannel",
+        "MuteSoundFile",
+        "UnmuteSoundFile",
+        "GetLootThreshold",
+        "SetLootThreshold"
     ],
     "Lua.diagnostics.disable": [
         "undefined-field",
