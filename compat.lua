@@ -42,6 +42,19 @@ function compat.CanAccess(...)
 	return true
 end
 
+-- True while Forever's chat messaging lockdown is active (encounters, challenge modes, PvP matches and
+-- communication-restricted maps such as dungeons and raids). Only Forever has this mechanic, so every
+-- other client always reports false.
+function compat.InChatLockdown()
+	if not compat.isForever then
+		return false
+	end
+	if C_ChatInfo and C_ChatInfo.InChatMessagingLockdown then
+		return C_ChatInfo.InChatMessagingLockdown() and true or false
+	end
+	return false
+end
+
 -- Era defines SetDesaturation natively; Forever does not, but AceGUI's checkbox calls it.
 if compat.isForever and not SetDesaturation then
 	function SetDesaturation(texture, desaturated)

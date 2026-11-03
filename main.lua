@@ -362,6 +362,36 @@ local options = {
 						return not AutoLayer.db.profile.layerSegments
 					end,
 				},
+				lockdownRequestWarning = {
+					type = "toggle",
+					name = "Chat Lockdown Warning",
+					desc = "Show an on-screen message (only visible to you) when a layer request is blocked because of a chat lockdown (e.g. in dungeons, raids, PvP or boss encounters).",
+					set = function(info, val)
+						AutoLayer.db.profile.lockdownRequestWarning = val
+					end,
+					get = function(info)
+						return AutoLayer.db.profile.lockdownRequestWarning
+					end,
+					order = 9,
+					hidden = function()
+						return not compat.isForever
+					end,
+				},
+				lockdownEndedMessage = {
+					type = "toggle",
+					name = "Chat Lockdown Over Message",
+					desc = "Print a message in your chat (only visible to you) when a chat lockdown ends after a layer request was blocked by it.",
+					set = function(info, val)
+						AutoLayer.db.profile.lockdownEndedMessage = val
+					end,
+					get = function(info)
+						return AutoLayer.db.profile.lockdownEndedMessage
+					end,
+					order = 10,
+					hidden = function()
+						return not compat.isForever
+					end,
+				},
 			},
 		},
 		loot = {
@@ -439,6 +469,8 @@ local defaults = {
 		guildOnly = false,
 		hideAutoWhispers = true,
 		hideSystemGroupMessages = true,
+		lockdownRequestWarning = true,
+		lockdownEndedMessage = true,
 		overrideLootSettings = false,
 		lootMethod = 0,
 		lootThreshold = 2,

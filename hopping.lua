@@ -9,7 +9,38 @@ local selected_layers = {}
 local is_closed = true
 local send
 
+local lockdownWatcher
+
+-- A layer request cannot work during a chat lockdown, so tell the player why. Both messages are local only.
+function AutoLayer:NotifyChatLockdownBlockedRequest()
+	if self.db.profile.lockdownRequestWarning and UIErrorsFrame then
+		UIErrorsFrame:AddMessage(
+			"AutoLayer: layer requests are unavailable during a chat lockdown (dungeon, raid, PvP or encounter).",
+			1, 0.1, 0.1
+		)
+	end
+
+	if self.db.profile.lockdownEndedMessage and not lockdownWatcher then
+		lockdownWatcher = C_Timer.NewTicker(1, function(ticker)
+			if addonTable.compat.InChatLockdown() then
+				return
+			end
+			ticker:Cancel()
+			lockdownWatcher = nil
+			if AutoLayer.db.profile.lockdownEndedMessage then
+				AutoLayer:Print("The chat lockdown is over, you can request a layer again.")
+			end
+		end)
+	end
+end
+
 function AutoLayer:SendLayerRequest()
+	if addonTable.compat.InChatLockdown() then
+		self:DebugPrint("Chat messaging lockdown: layer request blocked")
+		self:NotifyChatLockdownBlockedRequest()
+		return
+	end
+
 	local res = ""
 	local pendingLayerHop
 

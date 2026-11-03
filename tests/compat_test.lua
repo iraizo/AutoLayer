@@ -103,6 +103,25 @@ test("non-Forever: SetDesaturation is not installed", function()
 	local _, env = load_compat({GetBuildInfo = build(20506)})
 	assert(rawget(env, "SetDesaturation") == nil)
 end)
+test("InChatLockdown mirrors C_ChatInfo.InChatMessagingLockdown on Forever", function()
+	local locked = true
+	local c = load_compat({GetBuildInfo = build(16001),
+		C_ChatInfo = {InChatMessagingLockdown = function() return locked end}})
+	assert(c.InChatLockdown() == true)
+	locked = false
+	assert(c.InChatLockdown() == false)
+end)
+test("InChatLockdown false on Forever when the API is missing", function()
+	assert(load_compat({GetBuildInfo = build(16001)}).InChatLockdown() == false)
+	assert(load_compat({GetBuildInfo = build(16001), C_ChatInfo = {}}).InChatLockdown() == false)
+end)
+test("InChatLockdown is always false off Forever, even if the API reports true", function()
+	for _, v in ipairs({11508, 20506}) do
+		local c = load_compat({GetBuildInfo = build(v),
+			C_ChatInfo = {InChatMessagingLockdown = function() return true end}})
+		assert(c.InChatLockdown() == false, v)
+	end
+end)
 
 print(string.format("compat_test: %d passed, %d failed", passed, failed))
 os.exit(failed == 0 and 0 or 1)
