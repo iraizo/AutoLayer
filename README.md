@@ -1,6 +1,6 @@
 # AutoLayer - WoW Layering Community Addon
 
-AutoLayer automates layer-switching invites for World of Warcraft Classic Era and Burning Crusade Classic.
+AutoLayer automates layer-switching invites for World of Warcraft Classic Era, Burning Crusade Classic and WoW Forever (Camelot).
 
 ## Features
 
