@@ -9,8 +9,6 @@ local selected_layers = {}
 local is_closed = true
 local send
 
-local LeaveParty = C_PartyInfo and C_PartyInfo.LeaveParty or LeaveParty
-
 function AutoLayer:SendLayerRequest()
 	local res = ""
 	local pendingLayerHop

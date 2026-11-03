@@ -2,13 +2,6 @@
 
 AutoLayer automates layer-switching invites for World of Warcraft Classic Era and Burning Crusade Classic.
 
-## Supported Clients
-
-- **Classic Era**: Interfaces `11508` and `11509`
-- **Burning Crusade Classic**: Interface `20506`
-- Client-specific API and protocol compatibility
-- Optional BCC zone filtering and opt-in whispers when requests are rejected by the zone check
-
 ## Features
 
 - Configurable invite triggers, blacklist, ignored prefixes, and channel filters
