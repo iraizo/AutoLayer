@@ -5,6 +5,7 @@
 ## Version: 1.9.11
 ## SavedVariables: AutoLayerDB
 
+compat.lua
 embeds.xml
 main.lua
 configuration.lua

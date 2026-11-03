@@ -5,6 +5,10 @@ local GetAddOnMetadata = C_AddOns.GetAddOnMetadata
 
 local isBurningCrusade = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC
 addonTable.flavor = isBurningCrusade and "bcc" or "classic"
+-- On Forever the WOW_PROJECT_BURNING_CRUSADE_CLASSIC comparison is false (WOW_PROJECT_ID is WOW_PROJECT_CAMELOT = 18
+-- on current builds), so Forever intentionally falls into flavor == "classic" (segment protocol).
+-- Do not add a third flavor.
+local compat = addonTable.compat
 
 local ADDON_VERSION_FALLBACK = "1.9.11"
 local addonVersion = GetAddOnMetadata(addonName, "Version") or ADDON_VERSION_FALLBACK
@@ -535,6 +539,15 @@ addonTable.layerSegmentOverrides = {
 	[1954] = "OL", -- Silvermoon City, Eastern Kingdoms
 	[1957] = "OL", -- Isle of Quel'Danas, Eastern Kingdoms
 }
+
+-- Forever's starter islands are separate instance maps directly under Azeroth (947), so players there
+-- cannot share a layer with the continents (map IDs from Questie docs/forever-development.md).
+if compat.isForever then
+	addonTable.layerSegments["ZI"] = "Zephras Isle"
+	addonTable.layerSegments["DI"] = "Darkspear Islands"
+	addonTable.layerSegmentOverrides[2521] = "ZI"
+	addonTable.layerSegmentOverrides[2524] = "DI"
+end
 
 -- Determine in which layer segment the given unitID is. Defaults to the player if no unitID is given.
 -- This is necessary for the addon to work correctly in different segments (e.g. Azeroth vs Outland), as layers are specific to them.

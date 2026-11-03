@@ -1,1 +1,3 @@
 package-as: AutoLayer
+ignore:
+  - tests

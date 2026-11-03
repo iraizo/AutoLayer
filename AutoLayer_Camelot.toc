@@ -1,0 +1,13 @@
+## Interface: 16001
+## Title: AutoLayer
+## Notes: Automatically invites players who want to switch layers
+## Author: raizo
+## Version: 1.9.11
+## SavedVariables: AutoLayerDB
+
+compat.lua
+embeds.xml
+main.lua
+configuration.lua
+layering.lua
+hopping.lua

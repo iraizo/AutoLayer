@@ -27,7 +27,7 @@ function AutoLayer:SendLayerRequest()
 
 	res = res .. "inv layer "
 	res = res .. table.concat(selected_layers, ",")
-	LeaveParty()
+	addonTable.compat.LeaveParty()
 	table.insert(addonTable.send_queue, res)
 	if pendingLayerHop then
 		addonTable.pendingLayerHop = pendingLayerHop

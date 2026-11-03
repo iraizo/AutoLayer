@@ -57,7 +57,8 @@
         "ERR_DUNGEON_DIFFICULTY_CHANGED_S",
         "ERR_RAID_MEMBER_ADDED_S",
         "ChatFrameUtil",
-        "Constants"
+        "Constants",
+        "issecretvalue"
     ],
     "Lua.diagnostics.disable": [
         "undefined-field",
@@ -76,5 +77,8 @@
         "string": "disable",
         "table": "disable",
         "utf8": "disable"
-    }
+    },
+    "Lua.workspace.ignoreDir": [
+        "tests"
+    ]
 }

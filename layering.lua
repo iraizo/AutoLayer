@@ -1,5 +1,6 @@
 local addonName, addonTable = ...
 local CTL = _G.ChatThrottleLib
+local compat = addonTable.compat
 
 local playersInvitedRecently = {}
 local pendingPlayerInvites = {}
@@ -483,6 +484,11 @@ function AutoLayer:ProcessMessage(
 	channelIndex,
 	channelBaseName
 )
+	if not compat.CanAccess(msg, name, channelBaseName) then
+		self:DebugPrint("Chat messaging lockdown: ignoring chat message")
+		return
+	end
+
 	if not self.db.profile.enabled or isPlayerLoggingOut() then
 		return
 	end
@@ -698,7 +704,8 @@ function AutoLayer:ProcessMessage(
 	-- where we have to invite with the realm name
 	-- since those do not exist on anniversary servers and where HasActiveSeason() is true
 	-- we can validate it like this for now.
-	local isSeasonal = C_Seasons.HasActiveSeason()
+	-- On Forever there is no season API, so the full name (with realm) is used.
+	local isSeasonal = compat.IsSeasonal()
 	local shouldNotifyCompatibilityOnInvite = addonTable.flavor == "bcc"
 		and bccRequiresCompatibilityHandling
 		and bccShouldNotifyCompatibility
@@ -745,6 +752,9 @@ end
 
 ---@diagnostic disable-next-line: inject-field
 function AutoLayer:ProcessSystemMessages(_, SystemMessages)
+	if not compat.CanAccess(SystemMessages) then
+		return
+	end
 	if SystemMessages == ERR_GROUP_DISBANDED or SystemMessages == ERR_LEFT_GROUP_YOU then
 		clearGroupInviteTimes()
 	elseif SystemMessages:match("^" .. ERR_LEFT_GROUP_S:format("(.+)")) then
@@ -966,7 +976,7 @@ function AutoLayer:ProcessGroupJoined()
 			local leaderUnit = findGroupLeaderUnit()
 
 			if activePendingHop and playerZone and leaderZone and playerZone ~= leaderZone then
-				LeaveParty()
+				compat.LeaveParty()
 				addonTable.pendingLayerHop = nil
 				if leaderUnit then
 					sendCompatibilityNoticeOnce(UnitName(leaderUnit))

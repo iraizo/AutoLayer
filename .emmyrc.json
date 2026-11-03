@@ -8,7 +8,8 @@
             "~/.vscode/extensions/ketho.wow-api-0.22.3/Annotations/Core"
         ],
         "ignoreDir": [
-            "Lib"
+            "Lib",
+            "tests"
         ]
     },
     "diagnostics": {
@@ -29,6 +30,8 @@
             "ERR_ALREADY_IN_GROUP_S",
             "ERR_DECLINE_GROUP_S",
             "ERR_DUNGEON_DIFFICULTY_CHANGED_S",
+            "issecretvalue",
+            "SetDesaturation",
             "ERR_GROUP_DISBANDED",
             "ERR_GROUP_FULL",
             "ERR_INVITE_PLAYER_S",
