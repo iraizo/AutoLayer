@@ -1,12 +1,12 @@
 ---@diagnostic disable: inject-field
 
 local addonName, addonTable = ...
-local GetAddOnMetadata = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
+local GetAddOnMetadata = C_AddOns.GetAddOnMetadata
 
 local isBurningCrusade = WOW_PROJECT_ID == WOW_PROJECT_BURNING_CRUSADE_CLASSIC
 addonTable.flavor = isBurningCrusade and "bcc" or "classic"
 
-local ADDON_VERSION_FALLBACK = "1.9.9"
+local ADDON_VERSION_FALLBACK = "1.9.11"
 local addonVersion = GetAddOnMetadata(addonName, "Version") or ADDON_VERSION_FALLBACK
 addonTable.version = addonVersion
 
@@ -14,8 +14,8 @@ AutoLayer = LibStub("AceAddon-3.0"):NewAddon("AutoLayer", "AceConsole-3.0", "Ace
 AceGUI = LibStub("AceGUI-3.0")
 local minimap_icon = LibStub("LibDBIcon-1.0")
 local CTL = _G.ChatThrottleLib
-local ChatFrameAddMessageEventFilter = ChatFrameUtil and ChatFrameUtil.AddMessageEventFilter or ChatFrame_AddMessageEventFilter
-local ChatFrameRemoveMessageEventFilter = ChatFrameUtil and ChatFrameUtil.RemoveMessageEventFilter or ChatFrame_RemoveMessageEventFilter
+local ChatFrameAddMessageEventFilter = ChatFrameUtil.AddMessageEventFilter
+local ChatFrameRemoveMessageEventFilter = ChatFrameUtil.RemoveMessageEventFilter
 
 --- A helper function to ensure the length of a whisper won't exceed
 --- the 255 character limit but after currentLayer value substitution.

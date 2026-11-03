@@ -27,38 +27,6 @@ addonTable.activeLayerChannel = nil
 -- Channel list - will be populated after all addons load
 local LAYER_CHANNELS = {}
 
-if not C_Seasons then
-    C_Seasons = {}
-end
-if not C_Seasons.HasActiveSeason then
-    C_Seasons.HasActiveSeason = function()
-        return false
-    end
-end
-local UninviteUnit = (C_PartyInfo and C_PartyInfo.UninviteUnit) or _G.UninviteUnit
-
--- ERR_RAID_MEMBER_ADDED_S is missing on some clients the addon supports; when absent, raid
--- joins reuse the party join message. The pending compatibility notice is consumed on first
--- match, so a shared string cannot deliver the notice twice.
-local ERR_RAID_MEMBER_ADDED = _G.ERR_RAID_MEMBER_ADDED_S or ERR_JOINED_GROUP_S
-
-local function getCurrentCalendarTime()
-    if C_DateAndTime and C_DateAndTime.GetCurrentCalendarTime then
-        return C_DateAndTime.GetCurrentCalendarTime()
-    elseif C_DateAndTime and C_DateAndTime.GetTodaysDate then
-        local today = C_DateAndTime.GetTodaysDate()
-        return {
-            monthDay = today.day,
-            month = today.month,
-            year = today.year,
-            weekday = today.weekDay,
-            hour = 0,
-            minute = 0,
-        }
-    end
-    error("AutoLayer tried to call a Blizzard API function that does not exist...", 2)
-end
-
 -- Generate dynamic channel names based on server date and realm name
 local function GenerateLayerChannels()
 	local channels = {}
@@ -66,7 +34,7 @@ local function GenerateLayerChannels()
 	-- Always include the static "layer" channel first as primary/fallback
 	table.insert(channels, "layer")
 
-    local t = getCurrentCalendarTime()
+    local t = C_DateAndTime.GetCurrentCalendarTime()
 	local realmName = GetRealmName() or "Unknown"
 
 	-- Need LibDeflate for hashing
@@ -105,7 +73,7 @@ local function CleanupOldLayerChannels()
 	AutoLayer:DebugPrint("CleanupOldLayerChannels: Checking for old channels to leave...")
 
 	-- Check all joined channels and leave old layer_* ones
-	for i = 1, MAX_WOW_CHAT_CHANNELS or 20 do
+	for i = 1, Constants.ChatFrameConstants.MaxChatChannels do
 		local _, channelName = GetChannelName(i)
 		if channelName then
 			AutoLayer:DebugPrint("  Found channel: " .. channelName)
@@ -252,7 +220,7 @@ end
 
 --- Consumes the pending compatibility notice for the given character, if one was queued for
 --- their invite, and delivers it through sendCompatibilityNoticeOnce (which applies its own
---- throttle). Shared by accepted party (ERR_JOINED_GROUP_S) and raid (ERR_RAID_MEMBER_ADDED)
+--- throttle). Shared by accepted party (ERR_JOINED_GROUP_S) and raid (ERR_RAID_MEMBER_ADDED_S)
 --- joins so the notice is delivered when either invite type is accepted.
 --- @param characterName string The character name as it appeared in the join system message.
 local function deliverPendingCompatibilityNotice(characterName)
@@ -829,11 +797,11 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 		end
 	end
 
-	characterName = SystemMessages:match("^" .. ERR_RAID_MEMBER_ADDED:format("(.+)"))
+	characterName = SystemMessages:match("^" .. ERR_RAID_MEMBER_ADDED_S:format("(.+)"))
 	-- X joins the raid
 	if characterName then
 		local playerNameWithoutRealm = removeRealmName(characterName)
-		self:DebugPrint("ERR_RAID_MEMBER_ADDED", playerNameWithoutRealm, "found !")
+		self:DebugPrint("ERR_RAID_MEMBER_ADDED_S", playerNameWithoutRealm, "found !")
 		deliverPendingCompatibilityNotice(characterName)
 	end
 
@@ -934,7 +902,7 @@ function AutoLayer:HandleAutoKick()
 
 		self:DebugPrint("Kicking ", name)
 		runtimeStats.autoKicksExecuted = runtimeStats.autoKicksExecuted + 1
-		UninviteUnit(name)
+		C_PartyInfo.UninviteUnit(name)
 	end
 end
 
@@ -964,7 +932,6 @@ function AutoLayer:ProcessZoneChange()
 		end
 	end
 end
-local LeaveParty = C_PartyInfo and C_PartyInfo.LeaveParty or LeaveParty
 
 local function findGroupLeaderUnit()
 	local unitPrefix = IsInRaid() and "raid" or "party"
@@ -1097,7 +1064,7 @@ function JoinLayerChannel()
 		for i = 1, 10 do
 			if _G["ChatFrame" .. i] then
 				for _, ch in ipairs(LAYER_CHANNELS) do
-					ChatFrame_RemoveChannel(_G["ChatFrame" .. i], ch)
+					_G["ChatFrame" .. i]:RemoveChannel(ch)
 				end
 			end
 		end
