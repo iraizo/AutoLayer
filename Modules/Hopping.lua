@@ -107,14 +107,7 @@ function AutoLayer:SlashCommandRequest(input)
 		end
 	else
 		local currentLayer = AutoLayer:getCurrentLayer()
-		local nwbData = addonTable.NWB and addonTable.NWB.data
-		local nwbLayers = nwbData and nwbData.layers or {}
-
-		local layerNumbers = {}
-		for layerNumber in pairs(nwbLayers) do
-			layerNumbers[#layerNumbers + 1] = layerNumber
-		end
-		table.sort(layerNumbers)
+		local layerNumbers = AutoLayer:GetAvailableLayers()
 
 		if currentLayer and currentLayer > 0 and #layerNumbers > 0 then
 			self:DebugPrint("Received slash command request for all layers except current ( layer", currentLayer, ").")
@@ -171,7 +164,7 @@ function AutoLayer:HopGUI()
 	end)
 
 	-- Check if NovaWorldBuffs is installed
-	if addonTable.NWB == nil then
+	if not addonTable.hasNWB then
 		local desc = addonTable.AceGUI:Create("Label")
 		desc:SetText(
 			"Please consider installing NovaWorldBuffs addon, it allows you to discover current layer and select layers to hop to."
@@ -212,17 +205,8 @@ function AutoLayer:HopGUI()
 		layer:SetMultiselect(true)
 		layer:SetWidth(300)
 
-		local nwbData = addonTable.NWB and addonTable.NWB.data
-		local nwbLayers = nwbData and nwbData.layers or {}
-
-		local layerNumbers = {}
-		for layerNumber in pairs(nwbLayers) do
-			layerNumbers[#layerNumbers + 1] = layerNumber
-		end
-		table.sort(layerNumbers)
-
 		local layers = {}
-		for _, layerNumber in ipairs(layerNumbers) do
+		for _, layerNumber in ipairs(AutoLayer:GetAvailableLayers()) do
 			layers[#layers + 1] = tostring(layerNumber)
 		end
 

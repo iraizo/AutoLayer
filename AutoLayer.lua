@@ -11,7 +11,7 @@ addonTable.flavor = isBurningCrusade and "bcc" or "classic"
 local compat = addonTable.compat
 local util = addonTable.util
 
-local ADDON_VERSION_FALLBACK = "1.9.11"
+local ADDON_VERSION_FALLBACK = "1.9.12"
 local addonVersion = GetAddOnMetadata(addonName, "Version") or ADDON_VERSION_FALLBACK
 addonTable.version = addonVersion
 
@@ -333,7 +333,7 @@ local function formatOnOff(value)
 end
 
 local function getCurrentLayerDisplay()
-	if addonTable.NWB == nil then
+	if not addonTable.hasNWB then
 		return "unknown"
 	end
 
@@ -477,7 +477,7 @@ function AutoLayer:OnInitialize()
 			tooltip:AddLine("Right-click to hop layers")
 			tooltip:AddLine("Layered " .. self.db.profile.layered .. " times")
 
-			if addonTable.NWB ~= nil then
+			if addonTable.hasNWB then
 				local currentLayer = AutoLayer:getCurrentLayer()
 				if currentLayer == 0 then
 					tooltip:AddLine("Current layer: unknown, target an NPC")

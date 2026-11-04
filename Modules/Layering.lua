@@ -31,6 +31,7 @@ local runtimeStats = {
 -- Dynamic channel name system with date-based hashing
 local failedChannels = {} -- Track channels that failed to join (no retries)
 addonTable.activeLayerChannel = nil
+addonTable.hasNWB = false
 
 -- Channel list - will be populated after all addons load
 local LAYER_CHANNELS = {}
@@ -239,19 +240,54 @@ local function sendZoneMismatchNoticeOnce(target)
 	end
 end
 
+--- Detects NovaWorldBuffs. NWB <= 3.41 registers itself with AceAddon, while NWB 3.48 keeps
+--- its addon table local and only publishes NWB_CurrentLayer, NWB_CurrentLayerZoneID and the
+--- NWB_LayerUpdated() hook. addonTable.NWB therefore stays nil on modern NWB.
 function AutoLayer:addNWBToAddonTable()
-	for name in LibStub("AceAddon-3.0"):IterateAddons() do
-		if name == "NovaWorldBuffs" then
-			addonTable.NWB = LibStub("AceAddon-3.0"):GetAddon("NovaWorldBuffs")
-			return
-		end
+	addonTable.NWB = LibStub("AceAddon-3.0"):GetAddon("NovaWorldBuffs", true)
+	local loaded = false
+	if C_AddOns and C_AddOns.IsAddOnLoaded then
+		loaded = C_AddOns.IsAddOnLoaded("NovaWorldBuffs")
+	elseif IsAddOnLoaded then
+		loaded = IsAddOnLoaded("NovaWorldBuffs")
 	end
+	addonTable.hasNWB = addonTable.NWB ~= nil or NWB_CurrentLayer ~= nil or loaded == true
+end
+
+--- Returns the live NWB layer table. NWB 3.48 does not expose its addon table, but the live
+--- table still lives in the NWBdatabase saved variable:
+--- NWBdatabase.global[realm][faction].layers.
+--- @return table|nil
+local function getNWBLayerTable()
+	local nwb = addonTable.NWB
+	if nwb and nwb.data and type(nwb.data.layers) == "table" then
+		return nwb.data.layers
+	end
+
+	return util.GetNWBLayerTable(_G.NWBdatabase, GetRealmName(), UnitFactionGroup("player"))
+end
+
+--- Lists the layer numbers NovaWorldBuffs currently tracks for the player's world.
+--- @return table<number>
+function AutoLayer:GetAvailableLayers()
+	if not addonTable.hasNWB then
+		return {}
+	end
+
+	local layers = getNWBLayerTable()
+	if not layers then
+		return {}
+	end
+
+	local segment = addonTable.currentLayerSegment or AutoLayer:GetLayerSegment()
+	local storageID = util.GetNWBStorageID(layers, tonumber(NWB_CurrentLayerZoneID), segment)
+	return util.GetNWBLayerNumbers(layers, storageID)
 end
 
 --- Finds the current layer from NovaWorldBuffs
 --- @return number? layer The current layer number, or nil if the layer is unknown.
 function AutoLayer:getCurrentLayer()
-	if addonTable.NWB == nil then
+	if not addonTable.hasNWB then
 		return
 	end -- No NWB, nothing to do here
 
@@ -265,7 +301,7 @@ end
 -- Autoexec?
 C_Timer.After(0.1, function()
 	AutoLayer:addNWBToAddonTable()
-	if addonTable.NWB == nil then
+	if not addonTable.hasNWB then
 		AutoLayer:Print("Could not find NovaWorldBuffs, disabling NovaWorldBuffs integration")
 	end
 

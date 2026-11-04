@@ -163,6 +163,90 @@ function util.ParseLayers(message)
 	return uniqueLayers
 end
 
+--- Reads the live layer table from the NWBdatabase saved variable.
+---@param savedDatabase table|nil
+---@param realmName string|nil
+---@param factionName string|nil
+---@return table|nil
+function util.GetNWBLayerTable(savedDatabase, realmName, factionName)
+	local global = savedDatabase and savedDatabase.global
+	local realmData = global and realmName and global[realmName]
+	local factionData = realmData and factionName and realmData[factionName]
+	if factionData and type(factionData.layers) == "table" then
+		return factionData.layers
+	end
+	return nil
+end
+
+--- Lists the layer numbers NovaWorldBuffs exposes for one world.
+--- NWB <= 3.41 stores layers flat (capital city zoneID -> layer data); NWB 3.48 nests
+--- them per world ([storageID][capital city zoneID] -> layer data). NWB numbers a world's
+--- layers 1..N by sorted zone ID, so only the entry count matters here.
+---@param layers table|nil
+---@param storageID number|nil Only used for the nested (NWB 3.48+) layout.
+---@return table<number>
+function util.GetNWBLayerNumbers(layers, storageID)
+	if type(layers) ~= "table" then
+		return {}
+	end
+
+	-- Storage IDs are small sequential numbers (1 = Azeroth, 2 = Outland); layer IDs are
+	-- capital city zone IDs, so any small numeric key identifies the nested layout. Scan all
+	-- keys because pairs() order is undefined and the table may hold non-numeric keys.
+	local nested = false
+	for key in pairs(layers) do
+		if type(key) == "number" and key < 100 then
+			nested = true
+			break
+		end
+	end
+
+	local layerData = layers
+	if nested then
+		layerData = storageID and layers[storageID] or nil
+	end
+	if type(layerData) ~= "table" then
+		return {}
+	end
+
+	local count = 0
+	for layerID in pairs(layerData) do
+		if type(layerID) == "number" then
+			count = count + 1
+		end
+	end
+
+	local numbers = {}
+	for i = 1, count do
+		numbers[i] = i
+	end
+	return numbers
+end
+
+--- Resolves which world's layer table NovaWorldBuffs tracks.
+---@param layers table NWB layer data (flat or nested).
+---@param zoneID number|nil NWB_CurrentLayerZoneID: the capital city zone ID where NWB found the layer.
+---@param segment string|nil AutoLayer segment: "AZ" (Azeroth) or "OL" (Outland).
+---@return number storageID
+function util.GetNWBStorageID(layers, zoneID, segment)
+	-- The current map is authoritative; NWB's zone ID can outlive a world change.
+	if segment == "OL" then
+		return 2
+	elseif segment == "AZ" then
+		return 1
+	end
+
+	-- Instances have no segment, so fall back to the world NWB detected the layer in.
+	if zoneID and zoneID > 0 then
+		for storageID, layerData in pairs(layers) do
+			if type(layerData) == "table" and layerData[zoneID] then
+				return storageID
+			end
+		end
+	end
+	return 1
+end
+
 ---@param number number
 ---@param list table<number>
 ---@return boolean

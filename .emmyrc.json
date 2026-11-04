@@ -25,6 +25,8 @@
             "LeaveParty",
             "WorldFrame",
             "NWB_CurrentLayer",
+            "NWB_CurrentLayerZoneID",
+            "NWBdatabase",
             "StaticPopup_ForEachShownDialog",
             "UISpecialFrames",
             "ERR_ALREADY_IN_GROUP_S",
