@@ -1,3 +1,4 @@
 package-as: AutoLayer
 ignore:
-  - tests
+  - Modules/*.test.lua
+  - Modules/**/*.test.lua

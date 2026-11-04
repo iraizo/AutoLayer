@@ -1,6 +1,13 @@
 local addonName, addonTable = ...
 local CTL = _G.ChatThrottleLib
 local compat = addonTable.compat
+local util = addonTable.util
+
+local formatWhisperMessage = util.FormatWhisperMessage
+local removeRealmName = util.RemoveRealmName
+local normalizeCharacterName = util.NormalizeCharacterName
+
+local JoinLayerChannel
 
 local playersInvitedRecently = {}
 local pendingPlayerInvites = {}
@@ -124,36 +131,31 @@ local function isPlayerLoggingOut()
 	return isLoggingOut
 end
 
-local function formatWhisperMessage(template, currentLayer)
-	if template:find("{layer}") then
-		template = template:gsub("{layer}", currentLayer)
-	end
-	if template:find("%%s") then
-		template = string.format(template, currentLayer)
-	end
-	return template
-end
-
 function AutoLayer:pruneCache()
-	for i, cachedPlayer in ipairs(playersInvitedRecently) do
+	local currentTime = time()
+	-- Iterate backwards: table.remove shifts every later entry, so a forward loop skips entries.
+	for i = #playersInvitedRecently, 1, -1 do
+		local cachedPlayer = playersInvitedRecently[i]
 		-- delete players that are over 5 minutes old
-		if cachedPlayer.time + 300 < time() then
-			self:DebugPrint("Removing ", cachedPlayer.name, " from players invited recently")
+		if cachedPlayer.time + 300 < currentTime then
+			self:DebugPrint("Removing", cachedPlayer.name, "from players invited recently")
 			table.remove(playersInvitedRecently, i)
 		end
 	end
-	for i, cachedPlayer in ipairs(recentLayerRequests) do
+	for i = #recentLayerRequests, 1, -1 do
+		local cachedPlayer = recentLayerRequests[i]
 		-- delete players that are over 1 minute old
-		if cachedPlayer.time + 60 < time() then
-			self:DebugPrint("Removing ", cachedPlayer.name, " from recent layer requests")
+		if cachedPlayer.time + 60 < currentTime then
+			self:DebugPrint("Removing", cachedPlayer.name, "from recent layer requests")
 			table.remove(recentLayerRequests, i)
 		end
 	end
-	for i, cachedPlayer in ipairs(pendingPlayerInvites) do
+	for i = #pendingPlayerInvites, 1, -1 do
+		local cachedPlayer = pendingPlayerInvites[i]
 		-- delete pending invites for players that are over 3 minutes old
-		if cachedPlayer.time + 180 < time() then
-			self:DebugPrint("Removing ", cachedPlayer.name, " from pending player invites")
-			runtimeStats.inviteTimeouts = runtimeStats.inviteTimeouts + 1
+		-- The per-invite timer counts the timeout, so it is not counted again here.
+		if cachedPlayer.time + 180 < currentTime then
+			self:DebugPrint("Removing", cachedPlayer.name, "from pending player invites")
 			table.remove(pendingPlayerInvites, i)
 		end
 	end
@@ -169,27 +171,6 @@ end
 
 function AutoLayer:GetPrimaryLayerChannel()
 	return LAYER_CHANNELS[1]
-end
-
---- @param number number The number to check for in the list.
---- @param list table<number> The list of numbers to check against.
---- @return boolean is_in_list Whether the number is in the list.
-local function isNumberInList(number, list)
-	for _, value in ipairs(list) do
-		if value == number then
-			return true
-		end
-	end
-	return false
-end
-
-local function removeRealmName(name)
-	return ({ strsplit("-", name) })[1]
-end
-
-local function normalizeCharacterName(name)
-	local normalized = removeRealmName(name or "")
-	return string.lower(normalized)
 end
 
 local function queueCompatibilityNoticeForInvite(target)
@@ -258,125 +239,6 @@ local function sendZoneMismatchNoticeOnce(target)
 	end
 end
 
-local function stripColorCodes(msg)
-	if not msg then
-		return msg
-	end
-	-- Remove WoW color codes so addon prefixes like "[NWB]" still match reliably
-	msg = msg:gsub("|c%x%x%x%x%x%x%x%x", "")
-	msg = msg:gsub("|r", "")
-	return msg
-end
-
---- Checks if a message contains any word from a given list, with an option to respect word boundaries.
---- @param msg string The message to search through.
---- @param listOfWords table<string> A list of words to search for in the message.
---- @param respectWordBoundaries boolean? (optional) Whether to respect word boundaries in the search. Defaults to true.
---- @return boolean The first word found in the message that matches a word from the list; false otherwise.
-local function containsAnyWordFromList(msg, listOfWords, respectWordBoundaries)
-	-- Default to true if not explicitly set
-	respectWordBoundaries = respectWordBoundaries ~= false
-	local lowerMsg = string.lower(msg)
-
-	for _, word in ipairs(listOfWords) do
-		local lowerWord = string.lower(word)
-		local pattern
-
-		if respectWordBoundaries then
-			pattern = "%f[%a]" .. lowerWord .. "%f[%A]"
-		else
-			pattern = lowerWord
-		end
-
-		if string.find(lowerMsg, pattern) then
-			return word -- Return the matched word
-		end
-	end
-
-	return false -- Return false if nothing matched
-end
-
-local function containsAnyTriggersFromList(msg, listOfTriggers)
-	local lowermsg = string.lower(msg)
-
-	for _, trigger in ipairs(listOfTriggers) do
-		-- Match trigger as a whole word, case-insensitive
-		-- %f[%w] matches word boundary (lowercase w is start of word, uppercase W is end of word)
-		if string.match(lowermsg, "%f[%w]" .. string.lower(trigger) .. "%f[%W]") then
-			return trigger -- Return the trigger that matched
-		end
-	end
-
-	return false
-end
-
-local function containsAnyChannelFromList(channelName, listOfChannelNames)
-	local lowerName = string.lower(channelName)
-
-	for _, pattern in ipairs(listOfChannelNames) do
-		local luaPattern = string.gsub(pattern, "%*", ".*")
-
-		if string.match(lowerName, "^" .. luaPattern .. "$") then
-			return channelName -- Return the original channel name if it matches
-		end
-	end
-
-	return nil
-end
-
----  Extracts unique, sorted layer numbers from a message.
----  Identifies individual and ranged layer numbers (e.g., "1", "1-3") in a message,
----  compiling them into a sorted list without duplicates.
----
---- @param message string The input string containing layer numbers.
---- @return table<number> layer_numbers List of sorted, unique layer numbers.
-local MAX_LAYER = 20
-
-local function parseLayers(message)
-	local layers = {}
-
-	-- Add individual layers
-	for num in string.gmatch(message, "%d+") do
-		local n = tonumber(num)
-		if n >= 1 and n <= MAX_LAYER then
-			layers[#layers + 1] = n
-		end
-	end
-
-	-- Expand ranges, e.g. "layer 1-3" is the same as "layer 1,2,3"
-	for rangeStart, rangeEnd in string.gmatch(message, "(%d+)%-(%d+)") do
-		local startNum = tonumber(rangeStart)
-		local endNum = tonumber(rangeEnd)
-		-- but what if someone is a freak and says "layer 3-1" instead of "layer 1-3"?
-		if startNum > endNum then
-			startNum, endNum = endNum, startNum -- Swap values if out of order
-		end
-
-		-- Skip ranges entirely outside the valid layer range
-		if startNum <= MAX_LAYER and endNum >= 1 then
-			startNum = math.max(1, math.min(startNum, MAX_LAYER))
-			endNum = math.max(1, math.min(endNum, MAX_LAYER))
-			for i = startNum, endNum do
-				layers[#layers + 1] = i
-			end
-		end
-	end
-
-	-- Sort layers
-	table.sort(layers)
-
-	-- Make a new list without duplicates (this code assumes the list is already sorted)
-	local uniqueLayers = {}
-	uniqueLayers[1] = layers[1]
-	for i = 2, #layers do
-		if layers[i] ~= layers[i - 1] then
-			uniqueLayers[#uniqueLayers + 1] = layers[i]
-		end
-	end
-
-	return uniqueLayers
-end
-
 function AutoLayer:addNWBToAddonTable()
 	for name in LibStub("AceAddon-3.0"):IterateAddons() do
 		if name == "NovaWorldBuffs" then
@@ -393,10 +255,11 @@ function AutoLayer:getCurrentLayer()
 		return
 	end -- No NWB, nothing to do here
 
-	if NWB_CurrentLayer == nil or tonumber(NWB_CurrentLayer) == nil or NWB_CurrentLayer <= 0 then
+	local currentLayer = tonumber(NWB_CurrentLayer)
+	if not currentLayer or currentLayer <= 0 then
 		return 0
 	end
-	return tonumber(NWB_CurrentLayer)
+	return currentLayer
 end
 
 -- Autoexec?
@@ -497,15 +360,16 @@ function AutoLayer:ProcessMessage(
 		return
 	end
 
+	-- Whispers and guild messages carry no channel name; channel filtering must not see nil.
+	channelBaseName = channelBaseName or ""
+
 	-- Ignore messages that start with configured prefixes (e.g. addon announcements like "[NWB]")
-	do
-		local prefixes = (self.ParseIgnorePrefixes and self:ParseIgnorePrefixes()) or {}
-		if prefixes and #prefixes > 0 and msg then
-			local cleanMsg = string.lower(stripColorCodes(msg))
-			for _, prefix in ipairs(prefixes) do
-				if prefix ~= "" and cleanMsg:sub(1, #prefix) == prefix then
-					return
-				end
+	local prefixes = self:ParseIgnorePrefixes()
+	if #prefixes > 0 and msg then
+		local cleanLowerMsg = string.lower(util.StripColorCodes(msg))
+		for _, prefix in ipairs(prefixes) do
+			if cleanLowerMsg:sub(1, #prefix) == prefix then
+				return
 			end
 		end
 	end
@@ -553,12 +417,14 @@ function AutoLayer:ProcessMessage(
 		return
 	end
 
-	local triggerMatch = containsAnyTriggersFromList(msg, AutoLayer:ParseTriggers())
+	local lowerMsg = string.lower(msg)
+
+	local triggerMatch = util.FindMatchingTrigger(lowerMsg, self:ParseTriggers())
 	if not triggerMatch then
 		return
 	end
 
-	local blacklistMatch = containsAnyWordFromList(msg, AutoLayer:ParseBlacklist(), false)
+	local blacklistMatch = util.FindMatchingWord(lowerMsg, self:ParseBlacklist())
 	if blacklistMatch then
 		self:DebugPrint(
 			"Matched blacklist: '",
@@ -572,30 +438,28 @@ function AutoLayer:ProcessMessage(
 		return
 	end
 
-	if self.db.profile.channelFiltering == "inclusive" then
-		local inclusiveChannelMatch = containsAnyChannelFromList(channelBaseName, AutoLayer:ParseFilteredChannels())
-		if not inclusiveChannelMatch then
+	local channelFiltering = self.db.profile.channelFiltering
+	if channelFiltering ~= "none" then
+		local channelMatch = util.FindMatchingChannel(string.lower(channelBaseName), self:ParseFilteredChannels())
+		if channelFiltering == "inclusive" and not channelMatch then
 			self:DebugPrint(
 				"Did not match an included channel. Request came from player: '",
 				name,
 				"' in channel: '",
 				channelBaseName,
-				"' but currenty only allowing these channels: '",
-				AutoLayer:GetFilteredChannels(),
+				"' but currently only allowing these channels: '",
+				self:GetFilteredChannels(),
 				"'"
 			)
 			return
-		end
-	elseif self.db.profile.channelFiltering == "exclusive" then
-		local exclusiveChannelMatch = containsAnyChannelFromList(channelBaseName, AutoLayer:ParseFilteredChannels())
-		if exclusiveChannelMatch then
+		elseif channelFiltering == "exclusive" and channelMatch then
 			self:DebugPrint(
 				"Matched excluded request from player: '",
 				name,
 				"' in excluded channel: '",
 				channelBaseName,
 				"' from list of excluded channels: '",
-				AutoLayer:GetFilteredChannels(),
+				self:GetFilteredChannels(),
 				"'"
 			)
 			return
@@ -649,7 +513,7 @@ function AutoLayer:ProcessMessage(
 	local currentLayer = AutoLayer:getCurrentLayer()
 	local isHighPriorityRequest = (event == "CHAT_MSG_WHISPER")
 
-	if string.find(msg, "%d+") then -- Uh oh, this player is picky and wants a specific layer!
+	if string.find(lowerMsg, "%d+") then -- Uh oh, this player is picky and wants a specific layer!
 		if not currentLayer or currentLayer <= 0 then
 			self:DebugPrint(
 				"Message requested a specific layer, but we don't know what layer we're in! NWB says: ",
@@ -657,14 +521,14 @@ function AutoLayer:ProcessMessage(
 			)
 			return
 		end
-		local requestedLayers = parseLayers(msg)
-		if not requestedLayers or next(requestedLayers) == nil then
+		local requestedLayers = util.ParseLayers(lowerMsg)
+		if next(requestedLayers) == nil then
 			self:DebugPrint("Message requested a specific layer, but we couldn't parse the message successfully!")
 			return
 		end
 
-		local requestIsInverted = containsAnyWordFromList(msg, AutoLayer:ParseInvertKeywords(), false)
-		local currLayerMatchesRequest = isNumberInList(currentLayer, requestedLayers)
+		local requestIsInverted = util.FindMatchingWord(lowerMsg, self:ParseInvertKeywords())
+		local currLayerMatchesRequest = util.IsNumberInList(currentLayer, requestedLayers)
 
 		if requestIsInverted then
 			self:DebugPrint("Message requested any layers except:", table.concat(requestedLayers, ", "))
@@ -889,7 +753,8 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 		end
 
 		if self.db.profile.inviteWhisperReminder then
-			local finalMessage2 = "[AutoLayer] " .. string.format(self.db.profile.inviteWhisperTemplateReminder)
+			-- No string.format here: a "%" typed into the template must not throw.
+			local finalMessage2 = "[AutoLayer] " .. self.db.profile.inviteWhisperTemplateReminder
 			CTL:SendChatMessage("NORMAL", characterName, finalMessage2, "WHISPER", nil, characterName)
 		end
 	end
@@ -945,16 +810,6 @@ function AutoLayer:ProcessZoneChange()
 	end
 end
 
-local function findGroupLeaderUnit()
-	local unitPrefix = IsInRaid() and "raid" or "party"
-	for i = 1, GetNumGroupMembers() do
-		local unitID = unitPrefix .. i
-		if UnitIsGroupLeader(unitID) then
-			return unitID
-		end
-	end
-end
-
 function AutoLayer:ProcessGroupJoined()
 	if addonTable.flavor == "bcc" then
 		if not self.db.profile.layerSegments or UnitIsGroupLeader("player") then
@@ -975,7 +830,7 @@ function AutoLayer:ProcessGroupJoined()
 		C_Timer.After(2, function()
 			local activePendingHop = pendingLayerHop and addonTable.pendingLayerHop == pendingLayerHop
 			local playerZone, leaderZone = AutoLayer:CompareLayerZones()
-			local leaderUnit = findGroupLeaderUnit()
+			local leaderUnit = util.FindGroupLeaderUnit()
 
 			if activePendingHop and playerZone and leaderZone and playerZone ~= leaderZone then
 				compat.LeaveParty()
@@ -1024,9 +879,17 @@ AutoLayer:RegisterEvent("GROUP_ROSTER_UPDATE", "ProcessRosterUpdate")
 AutoLayer:RegisterEvent("ZONE_CHANGED_NEW_AREA", "ProcessZoneChange")
 AutoLayer:RegisterEvent("GROUP_JOINED", "ProcessGroupJoined")
 
-function JoinLayerChannel()
+local JOIN_ATTEMPT_INTERVAL = 10
+local lastJoinAttempt = 0
+
+JoinLayerChannel = function()
 	-- Join ALL channels to prevent griefing (so griefers can't become admin in empty channels)
 	-- Only try each channel once - if it fails (e.g. password protected), don't retry
+	local currentTime = time()
+	if currentTime - lastJoinAttempt < JOIN_ATTEMPT_INTERVAL then
+		return
+	end
+	lastJoinAttempt = currentTime
 
 	-- Step 1: Attempt to join all channels that are not marked as failed
 	for _, channelName in ipairs(LAYER_CHANNELS) do
@@ -1087,8 +950,7 @@ function JoinLayerChannel()
 	end)
 end
 
-function ProccessQueue()
-	AutoLayer:HandleAutoKick()
+local function ProcessQueue()
 	if #addonTable.send_queue > 0 then
 		local payload = table.remove(addonTable.send_queue, 1)
 		local sentToAny = false
@@ -1109,24 +971,23 @@ function ProccessQueue()
 	end
 end
 
-C_Timer.After(1, function()
-	WorldFrame:HookScript("OnMouseDown", function(self, button)
-		local activeChannel = addonTable.activeLayerChannel
-		if not activeChannel then
-			JoinLayerChannel()
-			return
-		end
-		local l_channel_num = GetChannelName(activeChannel)
-		if l_channel_num == 0 then
-			JoinLayerChannel()
-			return
-		end
+addonTable.ProcessQueue = ProcessQueue
 
-		AutoLayer:HandleAutoKick()
-		ProccessQueue()
+-- One low-frequency pump replaces the WorldFrame mouse hook and the key-hook frame:
+-- queued requests are sent within a second without reacting to every click and keypress.
+local sendPump
+
+function AutoLayer:StartSendPump()
+	if sendPump then
+		return
+	end
+	sendPump = C_Timer.NewTicker(1, function()
+		if not AutoLayer.db.profile.enabled then
+			return
+		end
+		if not addonTable.activeLayerChannel then
+			JoinLayerChannel()
+		end
+		ProcessQueue()
 	end)
-end)
-
-local f = CreateFrame("Frame", "Test", UIParent)
-f:SetScript("OnKeyDown", ProccessQueue)
-f:SetPropagateKeyboardInput(true)
+end

@@ -1,11 +1,11 @@
--- Run from the repo root: lua5.1 tests/compat_test.lua
+-- Run from the repo root: lua5.1 Modules/Compat.test.lua
 
 local function load_compat(globals)
 	local env = setmetatable({}, { __index = _G })
 	for k, v in pairs(globals or {}) do
 		rawset(env, k, v)
 	end
-	local chunk = assert(loadfile("compat.lua"))
+	local chunk = assert(loadfile("Modules/Compat.lua"))
 	setfenv(chunk, env)
 	local addonTable = {}
 	chunk("AutoLayer", addonTable)

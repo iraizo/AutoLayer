@@ -1,13 +1,14 @@
 local addonName, addonTable = ...
 addonTable.LibDeflate = LibStub("LibDeflate")
-addonTable.LibSerialize = LibStub("LibSerialize")
 
 addonTable.send_queue = {}
-addonTable.receive_queue = {}
 
 local selected_layers = {}
 local is_closed = true
 local send
+
+local HOPPER_FRAME_GLOBAL = "AutoLayerHopperFrame"
+local hopperFrameListed = false
 
 local lockdownWatcher
 
@@ -69,11 +70,20 @@ function AutoLayer:SendLayerRequest()
 		end)
 	end
 	AutoLayer:DebugPrint("Sending layer request: " .. res)
-	ProccessQueue()
+	-- Auto-kick stays a manual action: it drains when the player sends a request, never on a timer.
+	AutoLayer:HandleAutoKick()
+	addonTable.ProcessQueue()
 
-	-- Disable the send button to avoid the user from spam clicking it while the request is being processed
-	send:SetDisabled(true)
-	C_Timer.After(10, function() send:SetDisabled(false) end)
+	-- Disable the send button to avoid the user from spam clicking it while the request is being processed.
+	-- The button only exists while the hopper GUI is open, so /autolayer req must work without it.
+	if send then
+		send:SetDisabled(true)
+		C_Timer.After(10, function()
+			if send then
+				send:SetDisabled(false)
+			end
+		end)
+	end
 end
 
 function AutoLayer:SlashCommandRequest(input)
@@ -95,18 +105,27 @@ function AutoLayer:SlashCommandRequest(input)
 			self:Print("No valid layers specified in the request. Use a comma-separated list of layer numbers. For example: /autolayer req 1,2,3")
 			return
 		end
-	elseif NWB_CurrentLayer and NWB_CurrentLayer > 0 then
-		self:DebugPrint("Received slash command request for all layers except current ( layer", NWB_CurrentLayer, ").")
-
-		local count = 0
-		for _ in pairs(addonTable.NWB.data.layers) do
-			count = count + 1
-			if count ~= NWB_CurrentLayer then
-				table.insert(selected_layers, tostring(count))
-			end
-		end
 	else
-		self:DebugPrint("Received slash command request for all layers except current, but current layer is unknown. Requesting any layer.")
+		local currentLayer = AutoLayer:getCurrentLayer()
+		local nwbData = addonTable.NWB and addonTable.NWB.data
+		local nwbLayers = nwbData and nwbData.layers or {}
+
+		local layerNumbers = {}
+		for layerNumber in pairs(nwbLayers) do
+			layerNumbers[#layerNumbers + 1] = layerNumber
+		end
+		table.sort(layerNumbers)
+
+		if currentLayer and currentLayer > 0 and #layerNumbers > 0 then
+			self:DebugPrint("Received slash command request for all layers except current ( layer", currentLayer, ").")
+			for _, layerNumber in ipairs(layerNumbers) do
+				if layerNumber ~= currentLayer then
+					table.insert(selected_layers, tostring(layerNumber))
+				end
+			end
+		else
+			self:DebugPrint("Received slash command request for all layers except current, but current layer is unknown. Requesting any layer.")
+		end
 	end
 
 	AutoLayer:SendLayerRequest()
@@ -118,24 +137,33 @@ function AutoLayer:HopGUI()
 	end
 
 	is_closed = false
-	local frame = AceGUI:Create("Frame")
+	local frame = addonTable.AceGUI:Create("Frame")
 	frame:SetTitle("AutoLayer - Hopper")
 	frame:SetWidth(400)
 	frame:SetHeight(250)
 	frame:SetLayout("Flow")
 
-	-- Register the frame so it closes when pressing ESC
-	_G["AutoLayerHopperFrame"] = frame.frame
-	tinsert(UISpecialFrames, "AutoLayerHopperFrame")
+	-- Register the frame so it closes when pressing ESC. The global alias is re-pointed on
+	-- every open, but the UISpecialFrames entry itself is only added once.
+	_G[HOPPER_FRAME_GLOBAL] = frame.frame
+	if not hopperFrameListed then
+		tinsert(UISpecialFrames, HOPPER_FRAME_GLOBAL)
+		hopperFrameListed = true
+	end
 
-	frame:SetCallback("OnClose", function()
+	frame:SetCallback("OnClose", function(widget)
 		is_closed = true
 		selected_layers = {}
-		send:SetDisabled(false)
+		send = nil
+		if _G[HOPPER_FRAME_GLOBAL] == widget.frame then
+			_G[HOPPER_FRAME_GLOBAL] = nil
+		end
+		-- Release the widget instead of leaking a new AceGUI frame on every open
+		widget:Release()
 	end)
 
 	-- Create send button
-	send = AceGUI:Create("Button")
+	send = addonTable.AceGUI:Create("Button")
 	send:SetText("Send Layer Request")
 	send:SetWidth(160)
 	send:SetCallback("OnClick", function()
@@ -144,7 +172,7 @@ function AutoLayer:HopGUI()
 
 	-- Check if NovaWorldBuffs is installed
 	if addonTable.NWB == nil then
-		local desc = AceGUI:Create("Label")
+		local desc = addonTable.AceGUI:Create("Label")
 		desc:SetText(
 			"Please consider installing NovaWorldBuffs addon, it allows you to discover current layer and select layers to hop to."
 		)
@@ -153,24 +181,24 @@ function AutoLayer:HopGUI()
 		frame:AddChild(desc)
 	else
 		-- Create a header for clarity
-		local header = AceGUI:Create("Label")
+		local header = addonTable.AceGUI:Create("Label")
 		header:SetText("Select Layers to Hop to:")
 		header:SetFont("Fonts\\FRIZQT__.TTF", 14, "OUTLINE")
 		header:SetFullWidth(true)
 		header:SetJustifyH("CENTER")
 		frame:AddChild(header)
 
-		local currentLayerGroup = AceGUI:Create("InlineGroup")
+		local currentLayerGroup = addonTable.AceGUI:Create("InlineGroup")
 		currentLayerGroup:SetFullWidth(true)
 		currentLayerGroup:SetLayout("Flow")
 
-		local currentLayerDescriptionLabel = AceGUI:Create("Label")
+		local currentLayerDescriptionLabel = addonTable.AceGUI:Create("Label")
 		currentLayerDescriptionLabel:SetText("Current Layer:")
 		currentLayerDescriptionLabel:SetFont("Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
 		currentLayerDescriptionLabel:SetWidth(120)
 		currentLayerGroup:AddChild(currentLayerDescriptionLabel)
 
-		local currentLayerLabel = AceGUI:Create("Label")
+		local currentLayerLabel = addonTable.AceGUI:Create("Label")
 		currentLayerLabel:SetFontObject(GameFontHighlightSmall)
 		currentLayerLabel:SetWidth(170)
 		currentLayerGroup:AddChild(currentLayerLabel)
@@ -178,17 +206,24 @@ function AutoLayer:HopGUI()
 		frame:AddChild(currentLayerGroup)
 
 		-- Multi-combo box for selecting layers
-		local layer = AceGUI:Create("Dropdown")
+		local layer = addonTable.AceGUI:Create("Dropdown")
 		layer:SetLabel("Request Layers:")
 		layer:SetFullWidth(true)
 		layer:SetMultiselect(true)
 		layer:SetWidth(300)
 
-		local count = 0
+		local nwbData = addonTable.NWB and addonTable.NWB.data
+		local nwbLayers = nwbData and nwbData.layers or {}
+
+		local layerNumbers = {}
+		for layerNumber in pairs(nwbLayers) do
+			layerNumbers[#layerNumbers + 1] = layerNumber
+		end
+		table.sort(layerNumbers)
+
 		local layers = {}
-		for _ in pairs(addonTable.NWB.data.layers) do
-			count = count + 1
-			table.insert(layers, tostring(count))
+		for _, layerNumber in ipairs(layerNumbers) do
+			layers[#layers + 1] = tostring(layerNumber)
 		end
 
 		-- Set previously selected values
@@ -214,44 +249,48 @@ function AutoLayer:HopGUI()
 			end
 
 			-- Enable or disable the Send button
-			if #selected_layers > 0 then
-				send:SetText("Send Layer Request")
-			else
-				send:SetText("Request Any Layer")
+			if send then
+				if #selected_layers > 0 then
+					send:SetText("Send Layer Request")
+				else
+					send:SetText("Request Any Layer")
+				end
 			end
 		end
 
 		layer:SetCallback("OnValueChanged", OnValueChanged)
 
-		local currentLayer = NWB_CurrentLayer
+		local currentLayer = AutoLayer:getCurrentLayer()
 
 		if currentLayer and currentLayer > 0 then
 			-- autoselect all layers except the layer we're currently on
-			for i in ipairs(layers) do
-				if i ~= currentLayer then
-					layer:SetItemValue(i, true)
-					OnValueChanged(nil, nil, i, true) -- for god known reasons SetItemValue does not trigger OnValueChanged event so we have to do that manually :/
+			for index, layerNumber in ipairs(layers) do
+				if tonumber(layerNumber) ~= currentLayer then
+					layer:SetItemValue(index, true)
+					-- SetItemValue does not fire OnValueChanged, so the selection list is updated manually
+					OnValueChanged(nil, nil, layerNumber, true)
 				end
 			end
 		end
 
 		local lastKnownLayer = nil
-		local function UpdateLayerText() -- while UI open, constantly monitors changes to 'NWB_CurrentLayer' and updates UI
+		local function UpdateLayerText() -- while UI open, monitors changes to 'NWB_CurrentLayer' and updates UI
 			if is_closed then
 				return
 			end
 
-			local currentLayer = NWB_CurrentLayer
+			local currentLayer = AutoLayer:getCurrentLayer()
 
-			if currentLayer and lastKnownLayer ~= currentLayer then
-				if currentLayer > 0 then
-					for i, widget in layer.pullout:IterateItems() do
-						if widget.userdata.value == lastKnownLayer then
-							widget:SetText(lastKnownLayer)
+			if lastKnownLayer ~= currentLayer then
+				if currentLayer and currentLayer > 0 then
+					for _, widget in layer.pullout:IterateItems() do
+						local itemLayer = tonumber(widget.userdata.value)
+						if itemLayer == currentLayer then
+							widget:SetText(widget.userdata.value .. " (current)")
 							layer:SetMultiselect(layer:GetMultiselect()) -- the most decent way to trigger dropdown text update
-						elseif widget.userdata.value == currentLayer then
-							widget:SetText(currentLayer .. " (current)")
-							layer:SetMultiselect(layer:GetMultiselect()) -- the most decent way to trigger dropdown text update
+						elseif itemLayer == lastKnownLayer then
+							widget:SetText(widget.userdata.value)
+							layer:SetMultiselect(layer:GetMultiselect())
 						end
 					end
 
@@ -278,7 +317,7 @@ function AutoLayer:HopGUI()
 	frame:AddChild(send)
 
 	-- Add a label explaining there is a cooldown on layering
-	local cooldownLabel = AceGUI:Create("Label")
+	local cooldownLabel = addonTable.AceGUI:Create("Label")
 	cooldownLabel:SetText("|cffff0000Note:|r Blizzard enforces an increasing cooldown on layering.\nThe more you attempt to layer, the longer it takes each time.|r")
 	cooldownLabel:SetFullWidth(true)
 	frame:AddChild(cooldownLabel)

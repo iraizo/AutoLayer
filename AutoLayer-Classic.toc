@@ -5,9 +5,13 @@
 ## Version: 1.9.11
 ## SavedVariables: AutoLayerDB
 
-compat.lua
+Modules\Compat.lua
 embeds.xml
-main.lua
-configuration.lua
-layering.lua
-hopping.lua
+Modules\Libs\AutoLayerUtil.lua
+AutoLayer.lua
+Modules\Options\AutoLayerOptions.lua
+Modules\Options\AutoLayerOptionsDefaults.lua
+Modules\Migration.lua
+Modules\Configuration.lua
+Modules\Layering.lua
+Modules\Hopping.lua
