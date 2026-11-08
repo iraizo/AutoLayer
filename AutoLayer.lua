@@ -113,6 +113,10 @@ addonTable.layerSegmentOverrides = {
 	[1957] = "OL", -- Isle of Quel'Danas, Eastern Kingdoms
 }
 
+-- The Undercity courtyard can be its own orphan world-map row (Ruins of Lordaeron). Its chain can
+-- stop before Azeroth, and some clients ship the row without the parent map it points at.
+addonTable.layerSegmentOverrides[908] = "AZ"
+
 -- Forever's starter islands are separate instance maps directly under Azeroth (947), so players there
 -- cannot share a layer with the continents (map IDs from Questie docs/forever-development.md).
 if compat.isForever then
@@ -120,45 +124,38 @@ if compat.isForever then
 	addonTable.layerSegments["DI"] = "Darkspear Islands"
 	addonTable.layerSegmentOverrides[2521] = "ZI"
 	addonTable.layerSegmentOverrides[2524] = "DI"
+	-- Zephras Isle also has a second, parentless world-map row for the same zone.
+	addonTable.layerSegmentOverrides[2665] = "ZI"
 end
 
 -- Determine in which layer segment the given unitID is. Defaults to the player if no unitID is given.
 -- This is necessary for the addon to work correctly in different segments (e.g. Azeroth vs Outland), as layers are specific to them.
+---@return string|nil segment
+---@return number|nil mapID The best map for the unit, returned even when no segment matched.
 function AutoLayer:GetLayerSegment(unitID)
 	unitID = unitID or "player"
 	self:DebugPrint("Determining layer segment for", unitID, "(", UnitName(unitID), ")")
 	local mapID = C_Map.GetBestMapForUnit(unitID)
 	if not mapID then return nil end
 
-	local mapInfo = C_Map.GetMapInfo(mapID)
-	if not mapInfo then return nil end
-
-	while mapInfo.parentMapID and mapInfo.parentMapID ~= 0 do
-		-- Check if this mapID has a layer segment override, if so return the override value
-		if addonTable.layerSegmentOverrides[mapInfo.mapID] then
-			local overrideSegment = addonTable.layerSegmentOverrides[mapInfo.mapID]
-			self:DebugPrint(UnitName(unitID), "is in segment:", addonTable.layerSegments[overrideSegment], "( override for mapID", mapInfo.mapID, ")")
-			return overrideSegment
-		end
-
-		-- Check if the current mapID matches any of the layer segment mapIDs, if so return the corresponding segment
-		for k, v in pairs(addonTable.layerSegmentMapIDs) do
-			if mapInfo.mapID == v then
-				self:DebugPrint(UnitName(unitID), "is in segment:", addonTable.layerSegments[k])
-				return k
-			end
-		end
-
-		mapInfo = C_Map.GetMapInfo(mapInfo.parentMapID)
+	local segment = util.ResolveLayerSegment(
+		mapID,
+		C_Map.GetMapInfo,
+		addonTable.layerSegmentMapIDs,
+		addonTable.layerSegmentOverrides
+	)
+	if segment then
+		self:DebugPrint(UnitName(unitID), "is in segment:", addonTable.layerSegments[segment] or segment, "( mapID", mapID, ")")
+		return segment, mapID
 	end
 
-	-- If there was no match, return nil
 	if unitID == "player" and not IsActiveBattlefieldArena() and not self:IsInMaplessInstance() then
-		-- Arenas and some instances do not have a mapID, so we won't be able to determine a layer segment for them. In any other case, we should write a debug message.
-		self:DebugPrint("Layer segment could not be determined for mapID", C_Map.GetBestMapForUnit(unitID), "map name", C_Map.GetMapInfo(mapID).name)
+		-- Arenas and instances that lack a UiMap get no segment. Otherwise this is probably a new zone.
+		local mapInfo = C_Map.GetMapInfo(mapID)
+		self:DebugPrint("Layer segment could not be determined for mapID", mapID, "map name", mapInfo and mapInfo.name or "unknown")
 	end
 
-	return nil
+	return nil, mapID
 end
 
 -- Determine if the party leader is in the same layer segment as the player, if layer segments are enabled.

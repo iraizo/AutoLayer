@@ -83,7 +83,74 @@ test("NWB segment wins over a stale NWB_CurrentLayerZoneID", function()
 	assert(util.GetNWBStorageID(nested, 1955, "AZ") == 1)
 end)
 
-test("NWBdatabase lookup uses realm and faction", function()
+local SEGMENT_MAP_IDS = {AZ = 947, OL = 1945}
+
+local function mapInfoGetter(parents)
+	return function(mapID)
+		local parent = parents[mapID]
+		if parent == nil then
+			return nil
+		end
+		return {mapID = mapID, parentMapID = parent}
+	end
+end
+
+test("layer segment matches a zone nested under a continent", function()
+	local parents = {[1420] = 1415, [1415] = 947, [947] = 0}
+	assert(util.ResolveLayerSegment(1420, mapInfoGetter(parents), SEGMENT_MAP_IDS, {}) == "AZ")
+end)
+
+test("layer segment matches a segment root with no parent", function()
+	local getMapInfo = function()
+		error("the segment root must match before asking for map info")
+	end
+	assert(util.ResolveLayerSegment(947, getMapInfo, SEGMENT_MAP_IDS, {}) == "AZ")
+	assert(util.ResolveLayerSegment(1945, getMapInfo, SEGMENT_MAP_IDS, {}) == "OL")
+end)
+
+test("layer segment uses the nearest override on the parent chain", function()
+	local parents = {[1941] = 1415, [1415] = 947, [947] = 0}
+	assert(util.ResolveLayerSegment(1941, mapInfoGetter(parents), SEGMENT_MAP_IDS, {[1941] = "OL"}) == "OL")
+	assert(util.ResolveLayerSegment(1941, mapInfoGetter(parents), SEGMENT_MAP_IDS, {[1415] = "OL"}) == "OL")
+end)
+
+test("layer segment resolves a top-level Forever map through its override", function()
+	assert(util.ResolveLayerSegment(2521, mapInfoGetter({[2521] = 947, [947] = 0}), SEGMENT_MAP_IDS, {[2521] = "ZI"}) == "ZI")
+	assert(util.ResolveLayerSegment(2665, mapInfoGetter({[2665] = 0}), SEGMENT_MAP_IDS, {[2665] = "ZI"}) == "ZI")
+end)
+
+test("layer segment stops cleanly for nil, zero, missing maps and unclassified maps", function()
+	local parents = {[1420] = 1415, [1415] = 947, [947] = 0}
+	local getMapInfo = mapInfoGetter(parents)
+	assert(util.ResolveLayerSegment(nil, getMapInfo, SEGMENT_MAP_IDS, {}) == nil)
+	assert(util.ResolveLayerSegment(0, getMapInfo, SEGMENT_MAP_IDS, {}) == nil)
+	assert(util.ResolveLayerSegment(2999, getMapInfo, SEGMENT_MAP_IDS, {}) == nil)
+	assert(util.ResolveLayerSegment(1415, mapInfoGetter({[1415] = 0}), SEGMENT_MAP_IDS, {}) == nil)
+end)
+
+test("layer segment does not loop forever on a cyclic parent chain", function()
+	local parents = {[100] = 101, [101] = 100}
+	assert(util.ResolveLayerSegment(100, mapInfoGetter(parents), SEGMENT_MAP_IDS, {}) == nil)
+end)
+
+test("layer segment uses an override even when that map row is missing", function()
+	-- Forever can ship a child row whose parent ID (e.g. the Ruins of Lordaeron orphan) has no
+	-- GetMapInfo entry; the override must short-circuit the walk before map info is requested.
+	local parents = {[998] = 908}
+	assert(util.ResolveLayerSegment(998, mapInfoGetter(parents), SEGMENT_MAP_IDS, {[908] = "AZ"}) == "AZ")
+end)
+
+test("only world, continent and zone maps can report an unclassified segment", function()
+	assert(util.IsOpenWorldMapType(1) == true, "world")
+	assert(util.IsOpenWorldMapType(2) == true, "continent")
+	assert(util.IsOpenWorldMapType(3) == true, "zone")
+	assert(util.IsOpenWorldMapType(nil) == false, "nil")
+	for _, mapType in ipairs({0, 4, 5, 6}) do
+		assert(util.IsOpenWorldMapType(mapType) == false, "map type " .. mapType)
+	end
+end)
+
+test("NWB database lookup uses realm and faction", function()
 	local layers = {[1] = {[1454] = {}}}
 	local db = {
 		global = {

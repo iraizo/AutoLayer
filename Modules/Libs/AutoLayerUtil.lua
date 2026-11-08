@@ -1,6 +1,6 @@
 local _, addonTable = ...
 
---- Pure helpers for config parsing, message matching and whisper formatting.
+--- Pure helpers for config parsing, message matching, map resolution and whisper formatting.
 --- Nothing in here touches addon state, so it can be exercised with plain Lua.
 local util = {}
 addonTable.util = util
@@ -245,6 +245,48 @@ function util.GetNWBStorageID(layers, zoneID, segment)
 		end
 	end
 	return 1
+end
+
+--- Resolves the layer segment for a UiMap by walking up its parent chain.
+--- The starting map is checked as well: C_Map.GetBestMapForUnit can return a map that has
+--- no parent (a continent/world map while flying, or an instance map), so a lookup that only
+--- inspects ancestors misses valid segments and always fails for top-level maps.
+---@param mapID number|nil
+---@param getMapInfo fun(mapID: number): table|nil C_Map.GetMapInfo
+---@param segmentMapIDs table<string, number>
+---@param overrides table<number, string>|nil
+---@return string|nil segment
+function util.ResolveLayerSegment(mapID, getMapInfo, segmentMapIDs, overrides)
+	for _ = 1, 32 do
+		if not mapID or mapID == 0 then
+			return nil
+		end
+		if overrides and overrides[mapID] then
+			return overrides[mapID]
+		end
+		for segment, segmentMapID in pairs(segmentMapIDs) do
+			if mapID == segmentMapID then
+				return segment
+			end
+		end
+
+		local mapInfo = getMapInfo(mapID)
+		if not mapInfo then
+			return nil
+		end
+		mapID = mapInfo.parentMapID
+	end
+	return nil
+end
+
+--- Map types that own a UiMap in the layered open world.
+--- Enum.UIMapType: Cosmic=0, World=1, Continent=2, Zone=3, Dungeon=4, Micro=5, Orphan=6.
+--- Micro, orphan and dungeon maps are not layer-owned (e.g. Ruins of Lordaeron is an orphan row
+--- on clients that ship it), so a missing segment there must not be reported as a bug.
+---@param mapType number|nil
+---@return boolean
+function util.IsOpenWorldMapType(mapType)
+	return mapType == 1 or mapType == 2 or mapType == 3
 end
 
 ---@param number number

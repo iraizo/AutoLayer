@@ -831,15 +831,21 @@ function AutoLayer:ProcessZoneChange()
 	end
 
 	if self.db.profile.layerSegments then
-		local layer_segment = self:GetLayerSegment()
-		
+		local layer_segment, mapID = self:GetLayerSegment()
+
 		if layer_segment then
 			addonTable.currentLayerSegment = layer_segment
 			self:DebugPrint("Current layer segment set to:", layer_segment)
 		else
 			addonTable.currentLayerSegment = nil
-			-- Arenas and some instances do not have a mapID, so we won't be able to determine a layer segment for them. In any other case, this is probably a new zone that was not yet added.
-			if not IsActiveBattlefieldArena() and not self:IsInMaplessInstance() then
+			-- Layers only exist in the open world. GetBestMapForUnit can briefly return no map
+			-- while crossing zones or on a flight path, and instance/micro/orphan maps (e.g. the
+			-- Ruins of Lordaeron orphan row) have no layer chain. Only report a real open-world
+			-- map that we could not classify; anything else is an expected client state.
+			local inInstance = select(2, IsInInstance()) ~= "none"
+			local onTaxi = UnitOnTaxi and UnitOnTaxi("player")
+			local mapInfo = mapID and C_Map.GetMapInfo(mapID)
+			if util.IsOpenWorldMapType(mapInfo and mapInfo.mapType) and not inInstance and not onTaxi and not self:IsInMaplessInstance() then
 				self:Print("|cffff0000ERROR:|r Could not determine layer segment for current zone. This is a bug, please consider reporting it at https://github.com/iraizo/AutoLayer/issues ! Include details about which zone you are in.")
 			end
 		end
