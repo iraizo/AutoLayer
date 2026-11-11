@@ -18,6 +18,14 @@ function util.EscapePattern(text)
 	return (text:gsub(PATTERN_MAGIC, "%%%1"))
 end
 
+--- Anchored pattern for a WoW global string such as ERR_BAD_PLAYER_NAME_S ("Cannot find player '%s'."),
+--- with the first "%s" captured as "(.+)". The rest of the string is matched literally.
+---@param globalString string
+---@return string
+function util.MessagePattern(globalString)
+	return "^" .. (util.EscapePattern(globalString):gsub("%%%%s", "(.+)", 1)) .. "$"
+end
+
 --- Trims leading and trailing whitespace.
 ---@param text string
 ---@return string

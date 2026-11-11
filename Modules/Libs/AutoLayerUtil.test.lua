@@ -178,5 +178,20 @@ test("nested layout is detected regardless of key order or non-numeric keys", fu
 	end
 end)
 
+test("MessagePattern captures the name from a plain %s template", function()
+	local pattern = util.MessagePattern("Cannot find player '%s'.")
+	assert(("Cannot find player 'Bob'."):match(pattern) == "Bob")
+	assert(("Cannot find player 'Bob-Azjol-Nerub'."):match(pattern) == "Bob-Azjol-Nerub")
+	assert(("Cannot find player 'Bob'. extra"):match(pattern) == nil, "must be anchored")
+	assert(("You cannot find player 'Bob'."):match(pattern) == nil, "must be anchored")
+end)
+
+test("MessagePattern matches template punctuation literally", function()
+	local pattern = util.MessagePattern("Spieler (%s) nicht gefunden.")
+	assert(("Spieler (Bob) nicht gefunden."):match(pattern) == "Bob")
+	assert(("Spieler Bob nicht gefunden!"):match(pattern) == nil)
+	assert(("Spieler (Bob) nicht gefundenX"):match(pattern) == nil, "'.' must not be a wildcard")
+end)
+
 print(string.format("autolayer_util_test: %d passed, %d failed", passed, failed))
 os.exit(failed == 0 and 0 or 1)
