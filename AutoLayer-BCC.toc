@@ -2,7 +2,7 @@
 ## Title: AutoLayer
 ## Notes: Automatically invites players who want to switch layers
 ## Author: raizo
-## Version: 1.9.13
+## Version: 1.9.14
 ## SavedVariables: AutoLayerDB
 
 Modules\Compat.lua
