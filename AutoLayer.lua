@@ -89,6 +89,12 @@ local systemMessages = {
 	ERR_SET_LOOT_THRESHOLD_S,
 }
 
+-- Errors the game prints when an invite or an addon message targets a player who is no longer online
+local notFoundMessages = {
+	ERR_BAD_PLAYER_NAME_S,
+	ERR_CHAT_PLAYER_NOT_FOUND_S,
+}
+
 -- Layers are sometimes segmented by different areas, this table determines the segments to look for (values should be a name that can be returned by C_Map.GetMapInfo()).
 addonTable.layerSegments = {
 	["AZ"] = "Azeroth",
@@ -325,6 +331,17 @@ local function matchesAnySystemMessage(msg)
 	return false
 end
 
+-- Only for players AutoLayer just invited for a layer, so a name mistyped in a manual invite or whisper is still reported
+local function matchesNotFoundForLayerRequest(msg)
+	for _, notFoundMessage in ipairs(notFoundMessages) do
+		local name = msg:match("^" .. util.EscapePattern(notFoundMessage):gsub("%%%%s", "(.+)") .. "$")
+		if name and AutoLayer:IsRecentLayerRequest(name) then
+			return true
+		end
+	end
+	return false
+end
+
 local function formatOnOff(value)
 	return value and "on" or "off"
 end
@@ -543,7 +560,7 @@ end
 local systemGroupFilterActive = false
 
 local function systemFilter(_, _, msg, author, ...)
-	local filtered = AutoLayer:GetEnabled() and matchesAnySystemMessage(msg)
+	local filtered = AutoLayer:GetEnabled() and (matchesAnySystemMessage(msg) or matchesNotFoundForLayerRequest(msg))
 	return filtered, msg, author, ...
 end
 

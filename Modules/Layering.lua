@@ -162,6 +162,19 @@ function AutoLayer:pruneCache()
 	end
 end
 
+-- Whether AutoLayer invited this player for a layer in the last minute.
+-- pruneCache only runs on the next request, so the age is checked here too.
+function AutoLayer:IsRecentLayerRequest(name)
+	local playerNameWithoutRealm = removeRealmName(name)
+	local now = time()
+	for _, entry in ipairs(recentLayerRequests) do
+		if entry.name == playerNameWithoutRealm and entry.time + 60 >= now then
+			return true
+		end
+	end
+	return false
+end
+
 function AutoLayer:GetRuntimeStats()
 	return runtimeStats
 end
