@@ -677,10 +677,11 @@ function AutoLayer:ProcessSystemMessages(_, SystemMessages)
 		return
 	end
 
-	-- "Cannot find player" for a player we invited for a layer: on WoW Forever, a player on a PvP realm
+	-- "Cannot find player" for someone who just asked for a layer: on WoW Forever, a player on a PvP realm
 	-- can't be found from a PvE realm, so each new request would bring another failed invite.
+	-- (The message is also printed for failed whispers; caching a recent requester is harmless then.)
 	-- Cache the player as for a decline.
-	local notFoundName = SystemMessages:match("^" .. util.EscapePattern(ERR_BAD_PLAYER_NAME_S):gsub("%%%%s", "(.+)") .. "$")
+	local notFoundName = SystemMessages:match(util.MessagePattern(ERR_BAD_PLAYER_NAME_S))
 	if notFoundName and self:IsRecentLayerRequest(notFoundName) then
 		local playerNameWithoutRealm = removeRealmName(notFoundName)
 		table.insert(playersInvitedRecently, { name = playerNameWithoutRealm, time = time() })
