@@ -297,6 +297,35 @@ function util.IsOpenWorldMapType(mapType)
 	return mapType == 1 or mapType == 2 or mapType == 3
 end
 
+--- Resolves a UiMap to the zone-level map that owns it by walking up its parent chain, so a
+--- town or other micro map inside a zone counts as that zone. Returns nil for maps with no
+--- zone above them (continents, the world map) or when the chain cannot be read.
+---@param mapID number|nil
+---@param getMapInfo fun(mapID: number): table|nil C_Map.GetMapInfo
+---@return number|nil zoneMapID
+function util.ResolveZoneMapID(mapID, getMapInfo)
+	for _ = 1, 32 do
+		-- WoW Forever can return secret values, which cannot be compared.
+		if (issecretvalue and issecretvalue(mapID)) or type(mapID) ~= "number" or mapID == 0 then
+			return nil
+		end
+
+		local mapInfo = getMapInfo(mapID)
+		if not mapInfo or type(mapInfo.mapType) ~= "number" then
+			return nil
+		end
+
+		if mapInfo.mapType == 3 then
+			return mapID
+		end
+		if mapInfo.mapType < 3 then
+			return nil
+		end
+		mapID = mapInfo.parentMapID
+	end
+	return nil
+end
+
 ---@param number number
 ---@param list table<number>
 ---@return boolean
