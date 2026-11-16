@@ -223,5 +223,29 @@ test("ResolveZoneMapID returns nil above zone level and for unreadable maps", fu
 	assert(util.ResolveZoneMapID(1234, getMapInfo) == nil, "unknown map")
 end)
 
+test("ResolveZoneMapID does not treat a dungeon or orphan as its parent zone", function()
+	local maps = {
+		[5001] = { mapType = 4, parentMapID = 1440 }, -- dungeon listed under a zone
+		[6001] = { mapType = 6, parentMapID = 1440 }, -- orphan with a parent set
+		[1440] = { mapType = 3, parentMapID = 1414 },
+	}
+	local getMapInfo = function(mapID) return maps[mapID] end
+	assert(util.ResolveZoneMapID(5001, getMapInfo) == nil, "dungeon")
+	assert(util.ResolveZoneMapID(6001, getMapInfo) == nil, "orphan")
+end)
+
+test("ResolveZoneMapID stops on a cyclic or truncated parent chain", function()
+	local cyclic = {
+		[7001] = { mapType = 5, parentMapID = 7002 },
+		[7002] = { mapType = 5, parentMapID = 7001 },
+	}
+	assert(util.ResolveZoneMapID(7001, function(mapID) return cyclic[mapID] end) == nil, "cycle")
+
+	local truncated = {
+		[8001] = { mapType = 5 }, -- micro map without a parent
+	}
+	assert(util.ResolveZoneMapID(8001, function(mapID) return truncated[mapID] end) == nil, "missing parent")
+end)
+
 print(string.format("autolayer_util_test: %d passed, %d failed", passed, failed))
 os.exit(failed == 0 and 0 or 1)
