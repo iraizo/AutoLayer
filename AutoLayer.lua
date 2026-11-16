@@ -132,6 +132,15 @@ if compat.isForever then
 	addonTable.layerSegmentOverrides[2524] = "DI"
 	-- Zephras Isle also has a second, parentless world-map row for the same zone.
 	addonTable.layerSegmentOverrides[2665] = "ZI"
+
+	-- Some Forever layer zones are not type-3 UiMap rows (the starter islands are separate
+	-- instance maps) and Zephras has two rows for one zone. ResolveZoneMapID uses this table so
+	-- same-zone checks treat them as zones and fold the duplicate row onto the canonical map.
+	addonTable.layerZoneOverrides = {
+		[2521] = 2521,
+		[2524] = 2524,
+		[2665] = 2521,
+	}
 end
 
 -- Determine in which layer segment the given unitID is. Defaults to the player if no unitID is given.
@@ -162,6 +171,18 @@ function AutoLayer:GetLayerSegment(unitID)
 	end
 
 	return nil, mapID
+end
+
+-- Determine the zone-level map for a unit. Towns resolve to their zone, and Forever's known
+-- starter/duplicate rows resolve through addonTable.layerZoneOverrides.
+---@param unitID string|nil
+---@return number|nil
+function AutoLayer:GetLayerZoneID(unitID)
+	return util.ResolveZoneMapID(
+		C_Map.GetBestMapForUnit(unitID or "player"),
+		C_Map.GetMapInfo,
+		addonTable.layerZoneOverrides
+	)
 end
 
 -- Determine if the party leader is in the same layer segment as the player, if layer segments are enabled.

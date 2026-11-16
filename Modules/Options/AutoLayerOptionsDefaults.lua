@@ -32,6 +32,7 @@ addonTable.defaults = {
 		turnOffWhileRaidAssist = true,
 		layerSegments = true,
 		zoneMismatchWhisper = false,
+		foreverLeaveWrongZone = true,
 		showLayerWarning = true,
 		migrationVersion = 0,
 	},

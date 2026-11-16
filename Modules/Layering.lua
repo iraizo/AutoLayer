@@ -384,6 +384,30 @@ local function clearGroupInviteTimes()
 	end
 end
 
+--- Removes a leading <segment> prefix used by the segment protocol.
+---@param message string
+---@return string|nil prefix
+---@return string body
+local function stripSegmentPrefix(message)
+	local prefix = message:match("^<(%w+)> ")
+	if not prefix then
+		return nil, message
+	end
+	return prefix, (message:gsub("^<" .. prefix .. "> ", ""))
+end
+
+--- Removes a leading Forever <ALZ...> zone header.
+---@param message string
+---@return number|nil zoneID
+---@return string body
+local function stripZoneHeader(message)
+	local zoneID, body = util.ParseZoneHeader(message)
+	if not zoneID then
+		return nil, message
+	end
+	return zoneID, body
+end
+
 ---@diagnostic disable-next-line:inject-field
 function AutoLayer:ProcessMessage(
 	event,
@@ -427,6 +451,7 @@ function AutoLayer:ProcessMessage(
 	local bccMetadata
 	local bccRequiresCompatibilityHandling = false
 	local bccShouldNotifyCompatibility = false
+	local requesterZoneID
 
 	if addonTable.flavor == "bcc" then
 		local bccBody
@@ -444,12 +469,18 @@ function AutoLayer:ProcessMessage(
 			bccShouldNotifyCompatibility = bccRequiresCompatibilityHandling
 		end
 	else
-		-- Check if the message has a layer segment prefix. If it does, it should match our layer segment.
-		local segmentPrefix = msg:match("^<(%w+)> ")
+		-- Forever may prefix the requester's zone before or after the segment prefix. Strip it
+		-- before trigger/blacklist matching so its letters never affect either.
+		if compat.isForever then
+			requesterZoneID, msg = stripZoneHeader(msg)
+		end
 
-		-- Remove the matched prefix from msg, since it could inadvertently trigger things like blacklist or invert keywords
-		if segmentPrefix then
-			msg = msg:gsub("^<" .. segmentPrefix .. "> ", "")
+		-- Check if the message has a layer segment prefix. If it does, it should match our layer segment.
+		local segmentPrefix
+		segmentPrefix, msg = stripSegmentPrefix(msg)
+
+		if compat.isForever and not requesterZoneID then
+			requesterZoneID, msg = stripZoneHeader(msg)
 		end
 
 		if self.db.profile.layerSegments and addonTable.currentLayerSegment and segmentPrefix then
@@ -528,6 +559,26 @@ function AutoLayer:ProcessMessage(
 				return
 			end
 		end
+	end
+
+	-- Forever helpers filter by the inviting group's zone, not their own: a raid assistant can
+	-- invite for a leader in another zone, and the leader's zone is the one that determines
+	-- whether the invite changes the requester's layer. Old requesters carry no header, so
+	-- helpers accept them as before.
+	if compat.isForever and requesterZoneID and self.db.profile.layerSegments then
+		local leaderUnit = util.FindGroupLeaderUnit()
+		local targetZoneID = self:GetLayerZoneID("player")
+		if leaderUnit then
+			targetZoneID = self:GetLayerZoneID(leaderUnit)
+		end
+		if targetZoneID and requesterZoneID ~= targetZoneID then
+			self:DebugPrint(
+				"Request is from zone", requesterZoneID, "but the inviting group is in zone", targetZoneID, "ignoring"
+			)
+			sendZoneMismatchNoticeOnce(name)
+			return
+		end
+		self:DebugPrint("Request zone", requesterZoneID, "matches the inviting group's zone", targetZoneID or "unknown")
 	end
 
 	-- If we got this far, we have a valid match.
@@ -889,16 +940,25 @@ function AutoLayer:WarnLayerSegmentMismatch()
 	end
 end
 
---- Records who invited the player while a layer request hop is pending, so ProcessGroupJoined
---- only acts on a group joined from the invite that answered that request.
+--- Records every player who invited us while a Forever layer request is pending. Group
+--- membership later proves which invite was accepted, including raid-assist invites where the
+--- inviter is not the group leader.
 ---@param _ string Event name supplied by AceEvent
 ---@param inviterName string|nil
 function AutoLayer:ProcessPartyInviteRequest(_, inviterName)
 	local pendingLayerHop = addonTable.pendingLayerHop
-	if not pendingLayerHop or not inviterName then
+	if not compat.isForever or not pendingLayerHop or not inviterName then
 		return
 	end
-	pendingLayerHop.inviter = normalizeCharacterName(inviterName)
+	if not compat.CanAccess(inviterName) then
+		return
+	end
+	local normalized = normalizeCharacterName(inviterName)
+	if normalized == "" then
+		return
+	end
+	pendingLayerHop.inviters = pendingLayerHop.inviters or {}
+	pendingLayerHop.inviters[normalized] = true
 end
 
 function AutoLayer:ProcessGroupJoined()
@@ -949,9 +1009,8 @@ function AutoLayer:ProcessGroupJoined()
 	end
 
 	-- WoW Forever layers each zone separately, and a group invite cannot move a player to another
-	-- layer unless the leader is in the same zone (issue #143). Requests still reach helpers
-	-- anywhere, because the request format is unchanged so older AutoLayer versions keep working.
-	-- Instead, a group joined from our own request is left when its leader is in another zone.
+	-- layer unless the group leader is in the same zone (issue #143). New helpers filter requests
+	-- by zone before inviting; this fallback covers requests answered by older helpers.
 	if compat.isForever then
 		-- Any later join invalidates a pending zone check, which could otherwise read the new group.
 		joinCheckToken = joinCheckToken + 1
@@ -965,40 +1024,62 @@ function AutoLayer:ProcessGroupJoined()
 			-- The first group joined after a request uses up the hop, whether or not the check
 			-- below runs, so an old hop can never leak into a later, unrelated group.
 			addonTable.pendingLayerHop = nil
-			if self.db.profile.layerSegments and not UnitIsGroupLeader("player") then
-				local invitedBy = pendingLayerHop.inviter
-				if invitedBy then
-					self:DebugPrint("Group joined for a layer request, comparing zones with leader...")
-					local token = joinCheckToken
-					C_Timer.After(2, function()
-						if joinCheckToken ~= token then
-							return
-						end
 
-						local leaderUnit = util.FindGroupLeaderUnit()
-						if not leaderUnit then
-							self:DebugPrint("Could not find the party leader, not comparing zones.")
-							return
-						end
-						if normalizeCharacterName(UnitName(leaderUnit)) ~= invitedBy then
-							self:DebugPrint("Group leader", UnitName(leaderUnit), "did not send the layer invite, not leaving the group.")
-							-- This was not the layer invite, so keep the usual segment warning.
-							if self.db.profile.showLayerWarning then
-								self:WarnLayerSegmentMismatch()
-							end
-							return
-						end
+			local inviters = pendingLayerHop.inviters or {}
+			local warningsEnabled = self.db.profile.layerSegments and self.db.profile.showLayerWarning
 
-						local playerZone = util.ResolveZoneMapID(C_Map.GetBestMapForUnit("player"), C_Map.GetMapInfo)
-						local leaderZone = util.ResolveZoneMapID(C_Map.GetBestMapForUnit(leaderUnit), C_Map.GetMapInfo)
-						if not playerZone or not leaderZone or playerZone == leaderZone then
-							-- Same zone: the leader can still be on another layer segment.
-							if self.db.profile.showLayerWarning then
-								self:WarnLayerSegmentMismatch()
-							end
-							return
-						end
+			-- Group unit tokens can lag the GROUP_JOINED event, so check membership when the
+			-- delayed check runs rather than reading the roster immediately.
+			local function isInviteCorrelated()
+				local memberPrefix = IsInRaid() and "raid" or "party"
+				for i = 1, GetNumGroupMembers() do
+					local memberName = UnitName(memberPrefix .. i)
+					if memberName and compat.CanAccess(memberName)
+						and inviters[normalizeCharacterName(memberName)] then
+						return true
+					end
+				end
+				return false
+			end
 
+			if next(inviters) ~= nil and (self.db.profile.foreverLeaveWrongZone or warningsEnabled) then
+				local token = joinCheckToken
+				local attempts = 0
+				local function check()
+					attempts = attempts + 1
+					if joinCheckToken ~= token or (not IsInGroup() and not IsInRaid()) then
+						return
+					end
+					if UnitIsGroupLeader("player") then
+						return
+					end
+
+					local leaderUnit = util.FindGroupLeaderUnit()
+					if not leaderUnit then
+						if attempts < 3 then
+							C_Timer.After(2, check)
+						end
+						return
+					end
+
+					local inviteCorrelated = isInviteCorrelated()
+					local playerZone = self:GetLayerZoneID("player")
+					local leaderZone = self:GetLayerZoneID(leaderUnit)
+					local action = util.GetForeverGroupAction({
+						forever = true,
+						isLeader = false,
+						inviteCorrelated = inviteCorrelated,
+						leaveWrongZone = self.db.profile.foreverLeaveWrongZone,
+						warningsEnabled = warningsEnabled,
+						playerZone = playerZone,
+						leaderZone = leaderZone,
+					})
+
+					if action == "retry" and attempts < 3 then
+						C_Timer.After(2, check)
+						return
+					end
+					if action == "leave" then
 						compat.LeaveParty()
 						local playerZoneInfo = C_Map.GetMapInfo(playerZone)
 						local leaderZoneInfo = C_Map.GetMapInfo(leaderZone)
@@ -1006,10 +1087,16 @@ function AutoLayer:ProcessGroupJoined()
 							(leaderZoneInfo and leaderZoneInfo.name or "another zone") .. ", while you are in " ..
 							(playerZoneInfo and playerZoneInfo.name or "a different zone") ..
 							". On WoW Forever, layer invites only work within the same zone. You can request a layer again.")
-					end)
-					return
+						return
+					end
+					if action == "warn" or (action == "none" and not inviteCorrelated and warningsEnabled) then
+						self:WarnLayerSegmentMismatch()
+					elseif action == "retry" and warningsEnabled then
+						self:WarnLayerSegmentMismatch()
+					end
 				end
-				self:DebugPrint("Group joined for a layer request, but no invite was recorded, not comparing zones.")
+				C_Timer.After(2, check)
+				return
 			end
 		end
 	end

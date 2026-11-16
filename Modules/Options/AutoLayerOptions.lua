@@ -1,6 +1,7 @@
 local addonName, addonTable = ...
 local compat = addonTable.compat
 local util = addonTable.util
+local isZoneFiltering = addonTable.flavor == "bcc" or compat.isForever
 
 addonTable.options = {
 	name = "AutoLayer",
@@ -251,10 +252,12 @@ addonTable.options = {
 				},
 				layerSegments = {
 					type = "toggle",
-					name = addonTable.flavor == "bcc" and "Use Zone Filtering" or "Use Layer Segments",
+					name = isZoneFiltering and "Use Zone Filtering" or "Use Layer Segments",
 					desc = addonTable.flavor == "bcc"
 						and "Only invite players in the same zone."
-						or "Only invite players in the same layer segment. (e.g. Azeroth, Outland). This avoids party members not layering due to being in a different area of the world that uses different layers.",
+						or (compat.isForever
+							and "Only invite players in the same zone. This avoids invites that cannot change your layer on WoW Forever."
+							or "Only invite players in the same layer segment. (e.g. Azeroth, Outland). This avoids party members not layering due to being in a different area of the world that uses different layers."),
 					set = function(info, val)
 						AutoLayer.db.profile.layerSegments = val
 					end,
@@ -292,10 +295,25 @@ addonTable.options = {
 					end,
 					order = 8,
 					hidden = function()
-						return addonTable.flavor ~= "bcc"
+						return addonTable.flavor ~= "bcc" and not compat.isForever
 					end,
 					disabled = function()
 						return not AutoLayer.db.profile.layerSegments
+					end,
+				},
+				foreverLeaveWrongZone = {
+					type = "toggle",
+					name = "Leave Wrong-Zone Groups",
+					desc = "On WoW Forever, leave a group joined from your layer request when its leader is in another zone. Disable this if you accept unrelated invites while waiting.",
+					set = function(info, val)
+						AutoLayer.db.profile.foreverLeaveWrongZone = val
+					end,
+					get = function(info)
+						return AutoLayer.db.profile.foreverLeaveWrongZone
+					end,
+					order = 11,
+					hidden = function()
+						return not compat.isForever
 					end,
 				},
 				lockdownRequestWarning = {

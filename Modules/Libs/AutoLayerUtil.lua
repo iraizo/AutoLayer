@@ -303,12 +303,18 @@ end
 --- cannot be read.
 ---@param mapID number|nil
 ---@param getMapInfo fun(mapID: number): table|nil C_Map.GetMapInfo
+---@param overrides table<number, number>|nil Known layer zones, mapped to themselves or to a canonical row.
 ---@return number|nil zoneMapID
-function util.ResolveZoneMapID(mapID, getMapInfo)
+function util.ResolveZoneMapID(mapID, getMapInfo, overrides)
 	for _ = 1, 32 do
 		-- WoW Forever can return secret values, which cannot be compared.
 		if (issecretvalue and issecretvalue(mapID)) or type(mapID) ~= "number" or mapID == 0 then
 			return nil
+		end
+
+		local override = overrides and overrides[mapID]
+		if type(override) == "number" and override > 0 then
+			return override
 		end
 
 		local mapInfo = getMapInfo(mapID)
@@ -328,6 +334,100 @@ function util.ResolveZoneMapID(mapID, getMapInfo)
 		mapID = mapInfo.parentMapID
 	end
 	return nil
+end
+
+-- Forever zone header: <ALZ + four base-26 letters>. Letters only, so older AutoLayer
+-- versions that do not know the header strip it as an unknown chat prefix instead of
+-- reading its digits as layer numbers. The addon version stays out of the header: helpers
+-- without header support simply keep their previous behaviour.
+local ZONE_HEADER_PREFIX = "ALZ"
+local ZONE_HEADER_LENGTH = 4
+local ZONE_HEADER_BASE = 26
+local ZONE_HEADER_MAX = ZONE_HEADER_BASE ^ ZONE_HEADER_LENGTH - 1
+
+---@param zoneID number|nil
+---@return string|nil token
+function util.EncodeZoneID(zoneID)
+	if type(zoneID) ~= "number" or zoneID ~= math.floor(zoneID) or zoneID < 1 or zoneID > ZONE_HEADER_MAX then
+		return nil
+	end
+
+	local chars = {}
+	for i = ZONE_HEADER_LENGTH, 1, -1 do
+		local remainder = zoneID % ZONE_HEADER_BASE
+		chars[i] = string.char(65 + remainder)
+		zoneID = (zoneID - remainder) / ZONE_HEADER_BASE
+	end
+	return table.concat(chars)
+end
+
+---@param token string|nil
+---@return number|nil zoneID
+function util.DecodeZoneID(token)
+	if type(token) ~= "string" or #token ~= ZONE_HEADER_LENGTH or token:find("[^A-Z]") then
+		return nil
+	end
+
+	local zoneID = 0
+	for i = 1, ZONE_HEADER_LENGTH do
+		zoneID = zoneID * ZONE_HEADER_BASE + (string.byte(token, i) - 65)
+	end
+	if zoneID < 1 then
+		return nil
+	end
+	return zoneID
+end
+
+---@param zoneID number|nil
+---@return string|nil header including its trailing space
+function util.BuildZoneHeader(zoneID)
+	local token = util.EncodeZoneID(zoneID)
+	if not token then
+		return nil
+	end
+	return "<" .. ZONE_HEADER_PREFIX .. token .. "> "
+end
+
+--- Removes a leading Forever zone header. Returns nil when the message has no valid header.
+---@param message string|nil
+---@return number|nil zoneID
+---@return string|nil body
+function util.ParseZoneHeader(message)
+	local token, body = tostring(message or ""):match("^<" .. ZONE_HEADER_PREFIX .. "([A-Z]+)>%s+(.*)$")
+	if not token then
+		return nil
+	end
+	local zoneID = util.DecodeZoneID(token)
+	if not zoneID then
+		return nil
+	end
+	return zoneID, body
+end
+
+--- Decides what to do after joining a group on Forever. A group is only considered for
+--- the leave fallback when one of its members sent one of the pending layer invites.
+---@param opts table
+---@return "leave"|"warn"|"retry"|"none"
+function util.GetForeverGroupAction(opts)
+	if not opts.forever or opts.isLeader or not opts.inviteCorrelated then
+		return "none"
+	end
+	if not opts.playerZone or not opts.leaderZone then
+		return "retry"
+	end
+	if opts.playerZone ~= opts.leaderZone then
+		if opts.leaveWrongZone then
+			return "leave"
+		end
+		if opts.warningsEnabled then
+			return "warn"
+		end
+		return "none"
+	end
+	if opts.warningsEnabled then
+		return "warn"
+	end
+	return "none"
 end
 
 ---@param number number

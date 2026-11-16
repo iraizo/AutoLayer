@@ -247,5 +247,77 @@ test("ResolveZoneMapID stops on a cyclic or truncated parent chain", function()
 	assert(util.ResolveZoneMapID(8001, function(mapID) return truncated[mapID] end) == nil, "missing parent")
 end)
 
+test("zone header encodes map IDs without digits", function()
+	for _, zoneID in ipairs({1, 1440, 2521, 2524, 2665, 456975}) do
+		local header = util.BuildZoneHeader(zoneID)
+		assert(header ~= nil, "expected a header for " .. zoneID)
+		assert(header:match("^<ALZ%u%u%u%u> $"), "unexpected header " .. header)
+		assert(not header:find("%d"), "header must not contain digits")
+		local parsed, body = util.ParseZoneHeader(header .. "inv layer 1")
+		assert(parsed == zoneID, "round trip " .. zoneID)
+		assert(body == "inv layer 1", "body")
+	end
+end)
+
+test("zone header rejects unknown or out-of-range map IDs", function()
+	assert(util.BuildZoneHeader(nil) == nil)
+	assert(util.BuildZoneHeader(0) == nil)
+	assert(util.BuildZoneHeader(456976) == nil)
+	assert(util.DecodeZoneID("AAAA") == nil, "zero")
+	assert(util.DecodeZoneID("ABC") == nil, "short")
+	assert(util.DecodeZoneID("ABC1") == nil, "digit")
+	assert(util.ParseZoneHeader("inv layer 1") == nil)
+	assert(util.ParseZoneHeader("<ALZAAAA> inv layer 1") == nil)
+end)
+
+test("ResolveZoneMapID applies Forever zone overrides", function()
+	local maps = {
+		[2521] = { mapType = 4, parentMapID = 947 },
+		[2665] = { mapType = 3, parentMapID = 0 },
+	}
+	local getMapInfo = function(mapID) return maps[mapID] end
+	local overrides = { [2521] = 2521, [2524] = 2524, [2665] = 2521 }
+	assert(util.ResolveZoneMapID(2521, getMapInfo, overrides) == 2521)
+	assert(util.ResolveZoneMapID(2524, getMapInfo, overrides) == 2524, "missing row")
+	assert(util.ResolveZoneMapID(2665, getMapInfo, overrides) == 2521, "duplicate row")
+	assert(util.ResolveZoneMapID(2521, getMapInfo) == nil, "no override")
+	assert(util.ResolveZoneMapID(0, getMapInfo, overrides) == nil)
+end)
+
+test("Forever group action only leaves correlated wrong-zone groups", function()
+	local NIL = {}
+	local function action(overrides)
+		local opts = {
+			forever = true,
+			isLeader = false,
+			inviteCorrelated = true,
+			leaveWrongZone = true,
+			warningsEnabled = true,
+			playerZone = 1440,
+			leaderZone = 1441,
+		}
+		for key, value in pairs(overrides or {}) do
+			if value == NIL then
+				opts[key] = nil
+			else
+				opts[key] = value
+			end
+		end
+		return util.GetForeverGroupAction(opts)
+	end
+
+	assert(action() == "leave")
+	assert(action({leaveWrongZone = false}) == "warn")
+	assert(action({leaveWrongZone = false, warningsEnabled = false}) == "none")
+	assert(action({warningsEnabled = false}) == "leave")
+	assert(action({isLeader = true}) == "none")
+	assert(action({inviteCorrelated = false}) == "none")
+	assert(action({leaderZone = NIL}) == "retry")
+	assert(action({playerZone = NIL}) == "retry")
+	assert(action({playerZone = 1440, leaderZone = 1440}) == "warn")
+	assert(action({playerZone = 1440, leaderZone = 1440, warningsEnabled = false}) == "none")
+	assert(action({forever = false}) == "none")
+end)
+
 print(string.format("autolayer_util_test: %d passed, %d failed", passed, failed))
 os.exit(failed == 0 and 0 or 1)

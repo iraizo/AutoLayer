@@ -1,4 +1,5 @@
 local addonName, addonTable = ...
+local util = addonTable.util
 addonTable.LibDeflate = LibStub("LibDeflate")
 
 addonTable.send_queue = {}
@@ -57,11 +58,24 @@ function AutoLayer:SendLayerRequest()
 		res = "<" .. addonTable.currentLayerSegment .. "> "
 	end
 
+	-- Forever helpers can only invite usefully from the requester's zone. The zone header lets
+	-- them filter before inviting; it is letters-only so older Forever clients never read its
+	-- contents as layer numbers. It must follow the segment prefix: an older client would treat
+	-- a leading zone header as the segment prefix and drop the request. Without a known segment,
+	-- omit the zone header and let the requester-side fallback handle older helpers.
+	if addonTable.compat.isForever and self.db.profile.layerSegments and addonTable.currentLayerSegment then
+		local zoneHeader = util.BuildZoneHeader(self:GetLayerZoneID())
+		if zoneHeader then
+			res = res .. zoneHeader
+		end
+	end
+
 	-- On WoW Forever a group invite only changes the layer of the zone both players are in, so
 	-- remember this hop to check the inviting leader's zone once the group is joined.
-	if addonTable.compat.isForever and not pendingLayerHop then
+	if addonTable.compat.isForever and self.db.profile.foreverLeaveWrongZone then
 		pendingLayerHop = {
 			sentAt = time(),
+			inviters = {},
 		}
 	end
 

@@ -11,6 +11,7 @@ AutoLayer automates layer-switching invites for World of Warcraft Classic Era, B
 - Leader and raid-assistant permission checks
 - Manual auto-kick queue for offline or oldest group members
 - Optional party sounds and system-message suppression
+- Same-zone layer filtering on WoW Forever, with an optional fallback that leaves wrong-zone groups
 - Optional loot-method and threshold overrides
 
 ## Slash Commands
