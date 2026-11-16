@@ -193,5 +193,59 @@ test("MessagePattern matches template punctuation literally", function()
 	assert(("Spieler (Bob) nicht gefundenX"):match(pattern) == nil, "'.' must not be a wildcard")
 end)
 
+test("ResolveZoneMapID returns a zone map unchanged", function()
+	local getMapInfo = function(mapID)
+		return ({ [1440] = { mapType = 3, parentMapID = 1414 } })[mapID]
+	end
+	assert(util.ResolveZoneMapID(1440, getMapInfo) == 1440)
+end)
+
+test("ResolveZoneMapID walks a town up to its zone", function()
+	local maps = {
+		[9001] = { mapType = 5, parentMapID = 1440 }, -- micro map, e.g. a town
+		[1440] = { mapType = 3, parentMapID = 1414 }, -- Ashenvale
+		[1414] = { mapType = 2, parentMapID = 947 }, -- Kalimdor
+	}
+	assert(util.ResolveZoneMapID(9001, function(mapID) return maps[mapID] end) == 1440)
+end)
+
+test("ResolveZoneMapID returns nil above zone level and for unreadable maps", function()
+	local maps = {
+		[1414] = { mapType = 2, parentMapID = 947 },
+		[947] = { mapType = 1, parentMapID = 0 },
+		[7777] = { mapType = 6 }, -- orphan with no parent
+	}
+	local getMapInfo = function(mapID) return maps[mapID] end
+	assert(util.ResolveZoneMapID(1414, getMapInfo) == nil, "continent")
+	assert(util.ResolveZoneMapID(7777, getMapInfo) == nil, "orphan without a zone")
+	assert(util.ResolveZoneMapID(nil, getMapInfo) == nil, "no map")
+	assert(util.ResolveZoneMapID(0, getMapInfo) == nil, "map 0")
+	assert(util.ResolveZoneMapID(1234, getMapInfo) == nil, "unknown map")
+end)
+
+test("ResolveZoneMapID does not treat a dungeon or orphan as its parent zone", function()
+	local maps = {
+		[5001] = { mapType = 4, parentMapID = 1440 }, -- dungeon listed under a zone
+		[6001] = { mapType = 6, parentMapID = 1440 }, -- orphan with a parent set
+		[1440] = { mapType = 3, parentMapID = 1414 },
+	}
+	local getMapInfo = function(mapID) return maps[mapID] end
+	assert(util.ResolveZoneMapID(5001, getMapInfo) == nil, "dungeon")
+	assert(util.ResolveZoneMapID(6001, getMapInfo) == nil, "orphan")
+end)
+
+test("ResolveZoneMapID stops on a cyclic or truncated parent chain", function()
+	local cyclic = {
+		[7001] = { mapType = 5, parentMapID = 7002 },
+		[7002] = { mapType = 5, parentMapID = 7001 },
+	}
+	assert(util.ResolveZoneMapID(7001, function(mapID) return cyclic[mapID] end) == nil, "cycle")
+
+	local truncated = {
+		[8001] = { mapType = 5 }, -- micro map without a parent
+	}
+	assert(util.ResolveZoneMapID(8001, function(mapID) return truncated[mapID] end) == nil, "missing parent")
+end)
+
 print(string.format("autolayer_util_test: %d passed, %d failed", passed, failed))
 os.exit(failed == 0 and 0 or 1)

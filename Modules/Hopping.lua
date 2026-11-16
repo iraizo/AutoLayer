@@ -57,6 +57,14 @@ function AutoLayer:SendLayerRequest()
 		res = "<" .. addonTable.currentLayerSegment .. "> "
 	end
 
+	-- On WoW Forever a group invite only changes the layer of the zone both players are in, so
+	-- remember this hop to check the inviting leader's zone once the group is joined.
+	if addonTable.compat.isForever and not pendingLayerHop then
+		pendingLayerHop = {
+			sentAt = time(),
+		}
+	end
+
 	res = res .. "inv layer "
 	res = res .. table.concat(selected_layers, ",")
 	addonTable.compat.LeaveParty()

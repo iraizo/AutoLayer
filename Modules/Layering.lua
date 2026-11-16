@@ -18,6 +18,7 @@ local queuedKickNames = {}
 local compatibilityNoticeExpiry = {}
 local pendingCompatibilityNotices = {}
 local nextCompatibilityNoticeToken = 0
+local joinCheckToken = 0
 local zoneMismatchNoticeExpiry = {}
 local runtimeStats = {
 	matchedRequests = 0,
@@ -877,6 +878,29 @@ function AutoLayer:ProcessZoneChange()
 	end
 end
 
+--- Warns when the party leader's layer segment differs from the player's. Callers delay this by
+--- two seconds so the game can update group and zone information after a join.
+function AutoLayer:WarnLayerSegmentMismatch()
+	local playerSegment, leaderSegment = AutoLayer:CompareLayerSegments()
+	if playerSegment ~= leaderSegment then
+		self:Print("|cffffff00WARNING:|r You are in " .. (addonTable.layerSegments[playerSegment] or "an unknown segment") ..
+					", while the party leader is in " .. (addonTable.layerSegments[leaderSegment] or "an unknown segment") ..
+					". You will most likely not layer correctly. You can leave the party and try to layer again.")
+	end
+end
+
+--- Records who invited the player while a layer request hop is pending, so ProcessGroupJoined
+--- only acts on a group joined from the invite that answered that request.
+---@param _ string Event name supplied by AceEvent
+---@param inviterName string|nil
+function AutoLayer:ProcessPartyInviteRequest(_, inviterName)
+	local pendingLayerHop = addonTable.pendingLayerHop
+	if not pendingLayerHop or not inviterName then
+		return
+	end
+	pendingLayerHop.inviter = normalizeCharacterName(inviterName)
+end
+
 function AutoLayer:ProcessGroupJoined()
 	if addonTable.flavor == "bcc" then
 		if not self.db.profile.layerSegments or UnitIsGroupLeader("player") then
@@ -924,16 +948,77 @@ function AutoLayer:ProcessGroupJoined()
 		return
 	end
 
+	-- WoW Forever layers each zone separately, and a group invite cannot move a player to another
+	-- layer unless the leader is in the same zone (issue #143). Requests still reach helpers
+	-- anywhere, because the request format is unchanged so older AutoLayer versions keep working.
+	-- Instead, a group joined from our own request is left when its leader is in another zone.
+	if compat.isForever then
+		-- Any later join invalidates a pending zone check, which could otherwise read the new group.
+		joinCheckToken = joinCheckToken + 1
+		local pendingLayerHop = addonTable.pendingLayerHop
+		if pendingLayerHop and pendingLayerHop.sentAt + 300 < time() then
+			addonTable.pendingLayerHop = nil
+			pendingLayerHop = nil
+		end
+
+		if pendingLayerHop then
+			-- The first group joined after a request uses up the hop, whether or not the check
+			-- below runs, so an old hop can never leak into a later, unrelated group.
+			addonTable.pendingLayerHop = nil
+			if self.db.profile.layerSegments and not UnitIsGroupLeader("player") then
+				local invitedBy = pendingLayerHop.inviter
+				if invitedBy then
+					self:DebugPrint("Group joined for a layer request, comparing zones with leader...")
+					local token = joinCheckToken
+					C_Timer.After(2, function()
+						if joinCheckToken ~= token then
+							return
+						end
+
+						local leaderUnit = util.FindGroupLeaderUnit()
+						if not leaderUnit then
+							self:DebugPrint("Could not find the party leader, not comparing zones.")
+							return
+						end
+						if normalizeCharacterName(UnitName(leaderUnit)) ~= invitedBy then
+							self:DebugPrint("Group leader", UnitName(leaderUnit), "did not send the layer invite, not leaving the group.")
+							-- This was not the layer invite, so keep the usual segment warning.
+							if self.db.profile.showLayerWarning then
+								self:WarnLayerSegmentMismatch()
+							end
+							return
+						end
+
+						local playerZone = util.ResolveZoneMapID(C_Map.GetBestMapForUnit("player"), C_Map.GetMapInfo)
+						local leaderZone = util.ResolveZoneMapID(C_Map.GetBestMapForUnit(leaderUnit), C_Map.GetMapInfo)
+						if not playerZone or not leaderZone or playerZone == leaderZone then
+							-- Same zone: the leader can still be on another layer segment.
+							if self.db.profile.showLayerWarning then
+								self:WarnLayerSegmentMismatch()
+							end
+							return
+						end
+
+						compat.LeaveParty()
+						local playerZoneInfo = C_Map.GetMapInfo(playerZone)
+						local leaderZoneInfo = C_Map.GetMapInfo(leaderZone)
+						self:Print("|cffffff00Left the group:|r the party leader is in " ..
+							(leaderZoneInfo and leaderZoneInfo.name or "another zone") .. ", while you are in " ..
+							(playerZoneInfo and playerZoneInfo.name or "a different zone") ..
+							". On WoW Forever, layer invites only work within the same zone. You can request a layer again.")
+					end)
+					return
+				end
+				self:DebugPrint("Group joined for a layer request, but no invite was recorded, not comparing zones.")
+			end
+		end
+	end
+
 	if self.db.profile.layerSegments and self.db.profile.showLayerWarning and not UnitIsGroupLeader("player") then
 		self:DebugPrint("Group joined, comparing layer segments with leader...")
 		-- Grant the game a little bit of time to process the group join and update any relevant information before we compare segments
 		C_Timer.After(2, function()
-			local playerSegment, leaderSegment = AutoLayer:CompareLayerSegments()
-			if playerSegment ~= leaderSegment then
-				self:Print("|cffffff00WARNING:|r You are in " .. (addonTable.layerSegments[playerSegment] or "an unknown segment") ..
-							", while the party leader is in " .. (addonTable.layerSegments[leaderSegment] or "an unknown segment") ..
-							". You will most likely not layer correctly. You can leave the party and try to layer again.")
-			end
+			self:WarnLayerSegmentMismatch()
 		end)
 	end
 end
@@ -945,6 +1030,7 @@ AutoLayer:RegisterEvent("CHAT_MSG_SYSTEM", "ProcessSystemMessages")
 AutoLayer:RegisterEvent("GROUP_ROSTER_UPDATE", "ProcessRosterUpdate")
 AutoLayer:RegisterEvent("ZONE_CHANGED_NEW_AREA", "ProcessZoneChange")
 AutoLayer:RegisterEvent("GROUP_JOINED", "ProcessGroupJoined")
+AutoLayer:RegisterEvent("PARTY_INVITE_REQUEST", "ProcessPartyInviteRequest")
 
 local JOIN_ATTEMPT_INTERVAL = 10
 local lastJoinAttempt = 0
